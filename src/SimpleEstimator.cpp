@@ -10,7 +10,7 @@
 SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	// variables used by everyone
 	graph = g;
-	estimatorType = simpleSampling;
+	estimatorType = biasedSampling;
 
 
 	// ************ variables used by jc's code ******
@@ -19,6 +19,7 @@ SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	outgoing_labels = std::vector<uint32_t >(0);
 
 	// used for random sampling estimator
+	reduction_factor = 2.5;
 
 	// ************* variables used by radu's code ***********
 
@@ -33,9 +34,10 @@ void SimpleEstimator::prepare() {
 			prepareNaive();
 			break;
 		case simpleSampling:
-
 			break;
-
+		case biasedSampling:
+			prepForBiasedRandomSamplingEstimation();
+			break;
 		case radu:
 			break;
 
@@ -53,6 +55,8 @@ cardStat SimpleEstimator::estimate(RPQTree *q){
 		case simpleSampling:
 			result = estimateByRandomSampling(q);
 			break;
+		case biasedSampling:
+			result = estimateByBiasedRandomSampling(q);
 		case radu:
 			break;
 		case bodgan:
@@ -205,7 +209,6 @@ void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsi
 cardStat SimpleEstimator::estimateByRandomSampling(RPQTree *q) {
 	//std::cout << "Running simpleSamplingEstimator " << std::endl;
 	auto synopsis = std::make_shared<SimpleGraph>();
-	int reduction_factor = 3;
 	float percentage_to_keep = 1.0 / reduction_factor;
 
 	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
@@ -225,6 +228,87 @@ cardStat SimpleEstimator::estimateByRandomSampling(RPQTree *q) {
 	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
 
 	return cardStat{0, avgNoPaths, 0};
+}
+
+void SimpleEstimator::prepForBiasedRandomSamplingEstimation(){
+    //std::cout << "entering prepForBiasedRandomSamplingEstimation " << std::endl;
+    biasedSampledGraph = std::make_shared<SimpleGraph>();
+	biasedSampledGraph->setNoVertices(graph->getNoVertices());
+	biasedSampledGraph->setNoLabels(graph->getNoLabels());
+
+	// first make a copy of the original graph
+    //std::cout << "Making a copy of original graph" << std::endl;
+	for(uint32_t fromVertex = 0; fromVertex < graph->getNoVertices(); fromVertex++) {
+		for (auto labelTarget : graph->adj[fromVertex]) {
+			int target = labelTarget.second;
+			int label = labelTarget.first;
+			biasedSampledGraph->addEdge(fromVertex, target, label);
+		}
+	}
+
+
+	removeEdgesByRandomWalk(biasedSampledGraph, 1.0/reduction_factor);
+}
+
+void SimpleEstimator::removeEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
+										   float percentage_to_keep){
+
+	//std::cout << "Entering removeEdgesByRandomWalk" << std::endl;
+	uint32_t no_selected_edges = 0;
+	uint32_t edges_to_keep = std::floor(percentage_to_keep * synopsis->getNoEdges());
+
+	std::srand(std::time(nullptr)); // use current time as seed for random generator
+	int current_node = std::rand() % (synopsis->getNoVertices());
+
+	// teleport parameter
+	float alpha = 0.1;
+
+	// select random node to start the walking
+	while (synopsis->getNoEdges() > edges_to_keep){
+		//std::cout << "Edges to keep: " << edges_to_keep << std::endl;
+		//std::cout << "Number of edges: " << synopsis->getNoEdges() << std::endl;
+		if (std::rand() < alpha){
+			// teleport by change
+			current_node = std::rand() % (synopsis->getNoVertices());
+		} else if (synopsis->adj[current_node].size() <= 1){
+			// force teleportation to avoid destroying weak links
+			current_node = std::rand() % (synopsis->getNoVertices());
+		} else {
+			uint32_t next_pair_pos = std::rand() % (synopsis->adj[current_node].size());
+			std::pair<uint32_t, uint32_t> selected_pair = synopsis->adj[current_node][next_pair_pos];
+			// move current node to target
+			int next_node = selected_pair.second;
+			// remove the edge
+			synopsis->adj[current_node].erase(synopsis->adj[current_node].begin() + next_pair_pos);
+			current_node = next_node;
+		}
+
+	}
+	//std::cout << "Edges to keep: " << edges_to_keep << std::endl;
+	//std::cout << "Synopsis edges: " << synopsis->getNoEdges() << std::endl;
+}
+
+cardStat SimpleEstimator::estimateByBiasedRandomSampling(RPQTree *q) {
+	//std::cout << "Running estimatebyBiasedRandomSampling " << std::endl;
+	//prepareForSimpleSamplingEstimator(synopsis);
+	SimpleEvaluator eval = SimpleEvaluator(biasedSampledGraph);
+	cardStat firstStats = eval.evaluate(q);
+	firstStats.noPaths = firstStats.noPaths*reduction_factor;
+	return firstStats;
+	// resize the synopsis object
+	//delete &synopsis;
+
+	/**
+	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
+	//prepareForSimpleSamplingEstimator(synopsis);
+	eval = SimpleEvaluator(synopsis);
+	cardStat secondStats = eval.evaluate(q);
+	secondStats.noPaths = secondStats.noPaths*reduction_factor;
+
+	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
+
+	return cardStat{0, avgNoPaths, 0};
+	 **/
 }
 
 

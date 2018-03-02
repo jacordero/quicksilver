@@ -11,6 +11,7 @@
 enum EstimatorType {
 	naive,
 	simpleSampling,
+	biasedSampling,
 	radu,
 	bodgan
 };
@@ -29,7 +30,8 @@ class SimpleEstimator : public Estimator {
 	uint32_t length_query;
 
 	// used by simple random sampling
-
+	std::shared_ptr<SimpleGraph> biasedSampledGraph;
+	float reduction_factor;
 
 public:
 	explicit SimpleEstimator(std::shared_ptr<SimpleGraph> &g);
@@ -49,6 +51,12 @@ public:
 	void addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
 							  float percentage_to_keep, int no_edges);
 	cardStat estimateByRandomSampling(RPQTree *q);
+
+	/** used by modified sampling estimator **/
+	void prepForBiasedRandomSamplingEstimation();
+	void removeEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
+								 float percentage_to_keep);
+	cardStat estimateByBiasedRandomSampling(RPQTree *q);
 
 	/** used by [name] **/
 	void constructorRadu(std::shared_ptr<SimpleGraph> &g);
