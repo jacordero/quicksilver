@@ -205,7 +205,7 @@ void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsi
 cardStat SimpleEstimator::estimateByRandomSampling(RPQTree *q) {
 	//std::cout << "Running simpleSamplingEstimator " << std::endl;
 	auto synopsis = std::make_shared<SimpleGraph>();
-	int reduction_factor = 10;
+	int reduction_factor = 3;
 	float percentage_to_keep = 1.0 / reduction_factor;
 
 	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
@@ -222,7 +222,7 @@ cardStat SimpleEstimator::estimateByRandomSampling(RPQTree *q) {
 	cardStat secondStats = eval.evaluate(q);
 	secondStats.noPaths = secondStats.noPaths*reduction_factor;
 
-	int avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
+	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
 
 	return cardStat{0, avgNoPaths, 0};
 }
