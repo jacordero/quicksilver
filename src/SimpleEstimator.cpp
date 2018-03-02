@@ -174,7 +174,7 @@ void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsi
 	int current_node = std::rand() % (graph->getNoVertices());
 
 	// teleport parameter
-	float alpha = 1 / graph->getNoVertices();
+	float alpha = 0.2;
 
 	// select random node to start the walking
 	while (no_selected_edges < edges_to_select){
