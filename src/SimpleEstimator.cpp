@@ -6,18 +6,20 @@
 #include "SimpleEstimator.h"
 
 SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
-
-	// works only with SimpleGraph
-	graph = g;
-	labels = std::vector<uint32_t>(0);
-	out = graph->getNoVertices();
-	in = 0;
-	//length_query
-
+	constructorJorge(g);
 }
 
-void SimpleEstimator::prepare() {
+void SimpleEstimator::constructorJorge(std::shared_ptr<SimpleGraph> &g)
+{
+	// works only with SimpleGraph
+	graph = g;
+	incoming_labels = std::vector<uint32_t>(0);
+	outgoing_labels = std::vector<uint32_t >(0);
+	//length_query
+}
 
+void SimpleEstimator::prepareJorge()
+{
 	// do your prep here
 	// play a bit with the graph data structure
 	std::cout << "Number of labels for the given graph: " << graph->getNoLabels() << std::endl;
@@ -27,25 +29,26 @@ void SimpleEstimator::prepare() {
 	int no_labels = graph->getNoLabels();
 
 	// resize matrices
-
-	labels.resize(no_labels);
+	incoming_labels.resize(no_labels);
+	outgoing_labels.resize(no_labels);
 
 	// fill matrices
-	for (int i = 0; i < graph->adj.size(); i++)
-	{
-		auto adjElement = graph->adj[i];
+	int from = 0;
+	for (const auto & adjElement : graph->adj) {
 		for (const auto &vlPair : adjElement) {
 			uint8_t label = vlPair.first;
-			auto outEl = vlPair.second;
-
-			labels[label] = labels[label] + 1;
-			in++;
+			incoming_labels[label] = incoming_labels[label] + 1;
+			outgoing_labels[label] = outgoing_labels[label] + 1;
 		}
+		//std::cout << "From: " << from << ", Label: " << vlPair.first << ", To: " << vlPair.second << std::endl;
+
+		//from++;
 	}
+
 }
 
-cardStat SimpleEstimator::estimate(RPQTree *q) {
-
+cardStat SimpleEstimator::estimateJorge(RPQTree *q)
+{
 	q->print();
 	// perform your estimation here
 
@@ -68,11 +71,62 @@ cardStat SimpleEstimator::estimate(RPQTree *q) {
 	std::cout << "Larger number of labels: " << larger_number_labels << std::endl;
 
 	// noOut, noPaths, noIn
-	auto noOut = out / length_query;
-	auto noIn = (in - out) / length_query;
-	return cardStat{ noOut, smaller_number_labels * larger_number_labels, noIn };
+	return cardStat{ length_query, smaller_number_labels * larger_number_labels, length_query };
 
 	return cardStat{ 0, 0, 0 };
+}
+
+void SimpleEstimator::destructorJorge()
+{
+
+}
+
+void SimpleEstimator::constructorRadu(std::shared_ptr<SimpleGraph> &g)
+{
+
+}
+
+void SimpleEstimator::prepareRadu()
+{
+
+}
+
+cardStat SimpleEstimator::estimateRadu(RPQTree *q)
+{
+	return cardStat{ 0, 0, 0 };
+}
+
+void SimpleEstimator::destructorRadu()
+{
+
+}
+
+void SimpleEstimator::constructorBogdan(std::shared_ptr<SimpleGraph> &g)
+{
+
+}
+
+void SimpleEstimator::prepareBogdan()
+{
+
+}
+
+cardStat SimpleEstimator::estimateBogdan(RPQTree *q)
+{
+	return cardStat{ 0, 0, 0 };
+}
+
+void SimpleEstimator::destructorBogdan()
+{
+
+}
+
+void SimpleEstimator::prepare() {
+	prepareJorge();
+}
+
+cardStat SimpleEstimator::estimate(RPQTree *q) {
+	return estimateJorge(q);
 }
 
 
@@ -84,7 +138,7 @@ void SimpleEstimator::iterateRPQTree(RPQTree *q) {
 		if (onlyDigits(str)) {
 			int label_id = std::stoi(str, nullptr);
 			length_query++;
-			int no_labels = labels[label_id];
+			int no_labels = incoming_labels[label_id];
 			if (no_labels > larger_number_labels) {
 				larger_number_labels = no_labels;
 			}
