@@ -1,3 +1,17 @@
 /cmake-build-debug
 /cmake-build-release
 /.idea
+/.vs/config/applicationhost.config
+/.vs/launch.vs.json
+/.vs/ProjectSettings.json
+/.vs/quicksilver/v15/.suo
+/.vs/quicksilver/v15/Browse.VC.db
+/.vs/quicksilver/v15/Browse.VC.opendb
+/.vs/quicksilver/v15/ipch/AutoPCH/1e145b3821ddc646/SIMPLEGRAPH.ipch
+/.vs/quicksilver/v15/ipch/AutoPCH/756ccad30345300f/MAIN.ipch
+/.vs/quicksilver/v15/ipch/AutoPCH/abd3cf49802dc9a4/SIMPLEESTIMATOR.ipch
+/.vs/slnx.sqlite
+/input/graph.nt
+/input/queries.csv
+/include/RPQTree.h
+/src/main.cpp

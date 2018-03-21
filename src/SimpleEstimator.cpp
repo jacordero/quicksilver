@@ -10,7 +10,7 @@
 SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	// variables used by everyone
 	graph = g;
-	estimatorType = biasedSampling;
+	estimatorType = radu;
 
 
 	// ************ variables used by jc's code ******
@@ -22,7 +22,7 @@ SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	reduction_factor = 2.5;
 
 	// ************* variables used by radu's code ***********
-
+	constructorRadu(g);
 	// ************* variables used by bodgan's code ************
 }
 
@@ -39,6 +39,7 @@ void SimpleEstimator::prepare() {
 			prepForBiasedRandomSamplingEstimation();
 			break;
 		case radu:
+			prepareRadu();
 			break;
 
 		case bodgan:
@@ -57,7 +58,9 @@ cardStat SimpleEstimator::estimate(RPQTree *q){
 			break;
 		case biasedSampling:
 			result = estimateByBiasedRandomSampling(q);
+			break;
 		case radu:
+			result = estimateRadu(q);
 			break;
 		case bodgan:
 			break;
@@ -66,7 +69,7 @@ cardStat SimpleEstimator::estimate(RPQTree *q){
 }
 
 
-
+#pragma region Jorge
 void SimpleEstimator::prepareNaive() {
 	// do your prep here
 	// play a bit with the graph data structure
@@ -118,7 +121,7 @@ cardStat SimpleEstimator::estimateNaive(RPQTree *q) {
 	//std::cout << "Larger number of labels: " << larger_number_labels << std::endl;
 
 	// noOut, noPaths, noIn
-	return cardStat{length_query, smaller_number_labels * larger_number_labels, length_query};
+	return cardStat{ length_query, smaller_number_labels * larger_number_labels, length_query };
 }
 
 
@@ -150,14 +153,14 @@ bool SimpleEstimator::onlyDigits(std::string str) {
 	return (str.find_first_not_of("0123456789") == std::string::npos);
 }
 
-void SimpleEstimator::prepForRandomSamplingEstimator(std::shared_ptr<SimpleGraph> &synopsis){
+void SimpleEstimator::prepForRandomSamplingEstimator(std::shared_ptr<SimpleGraph> &synopsis) {
 	//std::cout << "Starting prepareForSimpleSamplingEstimator" << std::endl;
 	float percentage_to_keep = 0.2;
 	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
 }
 
 void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
-										   float percentage_to_keep, int no_edges){
+	float percentage_to_keep, int no_edges) {
 	//SimpleGraph synopsis = SimpleGraph();
 	// force to resize the graph
 	synopsis->setNoVertices(0);
@@ -181,18 +184,21 @@ void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsi
 	float alpha = 0.2;
 
 	// select random node to start the walking
-	while (no_selected_edges < edges_to_select){
+	while (no_selected_edges < edges_to_select) {
 
-		if (std::rand() < alpha){
+		if (std::rand() < alpha) {
 			// teleport by change
 			current_node = std::rand() % (graph->getNoVertices());
-		} else if (graph->adj[current_node].empty()){
+		}
+		else if (graph->adj[current_node].empty()) {
 			// force teleportation
 			current_node = std::rand() % (graph->getNoVertices());
-		} else if (synopsis->adj[current_node].size() >= graph->adj[current_node].size()){
+		}
+		else if (synopsis->adj[current_node].size() >= graph->adj[current_node].size()) {
 			// force teleportation because we already processed all edges here
 			current_node = std::rand() % (graph->getNoVertices());
-		} else {
+		}
+		else {
 			// here we allow duplication
 			int next_pair_pos = std::rand() % (graph->adj[current_node].size());
 			std::pair<uint32_t, uint32_t> selected_pair = graph->adj[current_node][next_pair_pos];
@@ -227,18 +233,18 @@ cardStat SimpleEstimator::estimateByRandomSampling(RPQTree *q) {
 
 	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
 
-	return cardStat{0, avgNoPaths, 0};
+	return cardStat{ 0, avgNoPaths, 0 };
 }
 
-void SimpleEstimator::prepForBiasedRandomSamplingEstimation(){
-    //std::cout << "entering prepForBiasedRandomSamplingEstimation " << std::endl;
-    biasedSampledGraph = std::make_shared<SimpleGraph>();
+void SimpleEstimator::prepForBiasedRandomSamplingEstimation() {
+	//std::cout << "entering prepForBiasedRandomSamplingEstimation " << std::endl;
+	biasedSampledGraph = std::make_shared<SimpleGraph>();
 	biasedSampledGraph->setNoVertices(graph->getNoVertices());
 	biasedSampledGraph->setNoLabels(graph->getNoLabels());
 
 	// first make a copy of the original graph
-    //std::cout << "Making a copy of original graph" << std::endl;
-	for(uint32_t fromVertex = 0; fromVertex < graph->getNoVertices(); fromVertex++) {
+	//std::cout << "Making a copy of original graph" << std::endl;
+	for (uint32_t fromVertex = 0; fromVertex < graph->getNoVertices(); fromVertex++) {
 		for (auto labelTarget : graph->adj[fromVertex]) {
 			int target = labelTarget.second;
 			int label = labelTarget.first;
@@ -247,11 +253,11 @@ void SimpleEstimator::prepForBiasedRandomSamplingEstimation(){
 	}
 
 
-	removeEdgesByRandomWalk(biasedSampledGraph, 1.0/reduction_factor);
+	removeEdgesByRandomWalk(biasedSampledGraph, 1.0 / reduction_factor);
 }
 
 void SimpleEstimator::removeEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
-										   float percentage_to_keep){
+	float percentage_to_keep) {
 
 	//std::cout << "Entering removeEdgesByRandomWalk" << std::endl;
 	uint32_t no_selected_edges = 0;
@@ -264,16 +270,18 @@ void SimpleEstimator::removeEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &syno
 	float alpha = 0.1;
 
 	// select random node to start the walking
-	while (synopsis->getNoEdges() > edges_to_keep){
+	while (synopsis->getNoEdges() > edges_to_keep) {
 		//std::cout << "Edges to keep: " << edges_to_keep << std::endl;
 		//std::cout << "Number of edges: " << synopsis->getNoEdges() << std::endl;
-		if (std::rand() < alpha){
+		if (std::rand() < alpha) {
 			// teleport by change
 			current_node = std::rand() % (synopsis->getNoVertices());
-		} else if (synopsis->adj[current_node].size() <= 1){
+		}
+		else if (synopsis->adj[current_node].size() <= 1) {
 			// force teleportation to avoid destroying weak links
 			current_node = std::rand() % (synopsis->getNoVertices());
-		} else {
+		}
+		else {
 			uint32_t next_pair_pos = std::rand() % (synopsis->adj[current_node].size());
 			std::pair<uint32_t, uint32_t> selected_pair = synopsis->adj[current_node][next_pair_pos];
 			// move current node to target
@@ -308,29 +316,102 @@ cardStat SimpleEstimator::estimateByBiasedRandomSampling(RPQTree *q) {
 	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
 
 	return cardStat{0, avgNoPaths, 0};
-	 **/
+	**/
 }
+#pragma endregion
 
-
+#pragma region Radu
 void SimpleEstimator::constructorRadu(std::shared_ptr<SimpleGraph> &g)
 {
-
+	//bucketsAdj.resize(graph->getNoLabels());
+	//bucketsReverseAdj.resize(graph->getNoLabels());
 }
 
 void SimpleEstimator::prepareRadu()
 {
+	srand(time(NULL));
+	uint32_t sumBucketAdj = 0, sumBucketReverseAdj = 0;
 
+	//construct bucket for adj list
+	for (const auto & adjElement : graph->adj) {
+		for (const auto &vlPair : adjElement) {
+			uint8_t label = vlPair.first;
+			uint32_t node = vlPair.second;
+			bucketsAdj[label].insert(node);
+		}
+	}
+
+	//sum the values of histogram for adj
+	for (auto i = 0; i < bucketsAdj.size(); i++)
+	{
+		sumBucketAdj += bucketsAdj[i].size();
+	}
+
+	//construct bucket for reverse_adj list
+	for (const auto & adjElement : graph->reverse_adj) {
+		for (const auto &vlPair : adjElement) {
+			uint8_t label = vlPair.first;
+			uint32_t node = vlPair.second;
+			bucketsReverseAdj[label].insert(node);
+		}
+	}
+
+	//sum the values of histogram for reverse_adj
+	for (auto i = 0; i < bucketsReverseAdj.size(); i++)
+	{
+		sumBucketReverseAdj += bucketsReverseAdj[i].size();
+	}
+
+	//get a ratio(ceil) based on the sum of two buckets / # vertices.
+	//auto divison = (float)(sumBucketAdj + sumBucketReverseAdj) / graph->getNoVertices();
+	uint32_t ratio = std::ceil(7);
+
+	//construct an estimated graph based on buckets and ratio.
+	estimatedGraphRadu = std::make_shared<SimpleGraph>();
+	estimatedGraphRadu->setNoVertices(graph->getNoVertices());
+	estimatedGraphRadu->setNoLabels(graph->getNoLabels());
+
+	for (auto i = 0; i < estimatedGraphRadu->getNoVertices(); i++) {
+		for (auto j = 0; j < ratio; j++)
+		{
+			int randIndex = rand() % bucketsAdj.size();
+			int randIndexList = rand() % bucketsAdj[randIndex].size();
+			
+			auto target = getNthElement(bucketsAdj[randIndex], randIndexList);
+			estimatedGraphRadu->addEdge(i, target.first , randIndex);
+		}	
+	}
+}
+
+template <typename T>
+std::pair<T, bool> SimpleEstimator::getNthElement(std::set<T> & searchSet, int n)
+{
+	std::pair<T, bool> result;
+	if (searchSet.size() > n)
+	{
+		result.first = *(std::next(searchSet.begin(), n));
+		result.second = true;
+	}
+	else
+		result.second = false;
+
+	return result;
 }
 
 cardStat SimpleEstimator::estimateRadu(RPQTree *q)
 {
-	return cardStat{ 0, 0, 0 };
+	SimpleEvaluator eval = SimpleEvaluator(estimatedGraphRadu);
+	return eval.evaluate(q);
 }
 
 void SimpleEstimator::destructorRadu()
 {
 
 }
+
+#pragma endregion
+
+#pragma region Bogdan
 
 void SimpleEstimator::constructorBogdan(std::shared_ptr<SimpleGraph> &g)
 {
@@ -351,5 +432,4 @@ void SimpleEstimator::destructorBogdan()
 {
 
 }
-
-
+#pragma endregion

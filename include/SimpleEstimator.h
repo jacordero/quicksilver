@@ -7,6 +7,8 @@
 
 #include "Estimator.h"
 #include "SimpleGraph.h"
+#include <map>
+#include <set>
 
 enum EstimatorType {
 	naive,
@@ -63,6 +65,13 @@ public:
 	void prepareRadu();
 	cardStat estimateRadu(RPQTree *q);
 	void destructorRadu();
+	
+	std::map<uint32_t, std::set<uint32_t>> bucketsAdj;
+	std::map<uint32_t, std::set<uint32_t>> bucketsReverseAdj;
+	std::shared_ptr<SimpleGraph> estimatedGraphRadu;
+
+	template <typename T>
+	std::pair<T, bool> getNthElement(std::set<T> & searchSet, int n);
 
 	/** used by [name] **/
 	void constructorBogdan(std::shared_ptr<SimpleGraph> &g);
