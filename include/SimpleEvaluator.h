@@ -13,8 +13,21 @@
 #include "Evaluator.h"
 #include "Graph.h"
 
+class LRUCache {
+
+    int maxSize = 40;
+    std::deque<std::pair<std::string,std::shared_ptr<SimpleGraph>>> cache;
+
+public:
+    LRUCache();
+    ~LRUCache() = default;
+    std::shared_ptr<SimpleGraph> getFromCache(RPQTree *query);
+    void addToCache(RPQTree *query, std::shared_ptr<SimpleGraph> &g);
+};
+
 class SimpleEvaluator : public Evaluator {
 
+    LRUCache cache;
     std::shared_ptr<SimpleGraph> graph;
     std::shared_ptr<SimpleEstimator> est;
 
@@ -33,8 +46,8 @@ public:
     static std::shared_ptr<SimpleGraph> join(std::shared_ptr<SimpleGraph> &left, std::shared_ptr<SimpleGraph> &right);
 
     static cardStat computeStats(std::shared_ptr<SimpleGraph> &g);
+    static std::string treeToString(RPQTree *query);
 
 };
-
 
 #endif //QS_SIMPLEEVALUATOR_H

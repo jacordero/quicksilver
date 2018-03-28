@@ -63,7 +63,6 @@ RPQTree* RPQTree::strToTree(std::string &str) {
 }
 
 void RPQTree::print() {
-
     if(left == nullptr && right == nullptr) {
         std::cout << ' ' << data << ' ';
     } else {
@@ -72,7 +71,6 @@ void RPQTree::print() {
         if(right!= nullptr) right->print();
         std::cout << ')';
     }
-
 }
 
 bool RPQTree::isConcat() {

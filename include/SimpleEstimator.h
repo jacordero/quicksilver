@@ -32,6 +32,11 @@ class SimpleEstimator : public Estimator {
 	uint32_t length_query;
 
 	// used by simple random sampling
+	std::shared_ptr<SimpleGraph> firstSimpleSampledGraph;
+	std::shared_ptr<SimpleGraph> secondSimpleSampledGraph;
+	float percentage_to_keep;
+
+	// used by biased random sampling
 	std::shared_ptr<SimpleGraph> biasedSampledGraph;
 	float reduction_factor;
 
@@ -49,7 +54,7 @@ public:
 	bool onlyDigits(std::string str);
 
 	/** used by random sampling estimator **/
-	void prepForRandomSamplingEstimator(std::shared_ptr<SimpleGraph> &synopsis);
+	void prepForRandomSamplingEstimator();
 	void addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
 							  float percentage_to_keep, int no_edges);
 	cardStat estimateByRandomSampling(RPQTree *q);

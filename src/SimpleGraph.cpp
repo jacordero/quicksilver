@@ -14,14 +14,15 @@ uint32_t SimpleGraph::getNoVertices() const {
 
 void SimpleGraph::setNoVertices(uint32_t n) {
     V = n;
-    adj.resize(V);
-    reverse_adj.resize(V);
+    //adj.resize(V);
+    //reverse_adj.resize(V);
 }
 
 uint32_t SimpleGraph::getNoEdges() const {
     uint32_t sum = 0;
-    for (const auto & l : adj)
-        sum += l.size();
+    for (const auto & mEntry : adj){
+        sum += mEntry.second.size();
+    }
     return sum;
 }
 
@@ -36,8 +37,9 @@ uint32_t SimpleGraph::getNoDistinctEdges() const {
 
     uint32_t sum = 0;
 
-    for (auto sourceVec : adj) {
+    for (auto &mapEntry : adj) {
 
+        auto sourceVec = mapEntry.second;
         std::sort(sourceVec.begin(), sourceVec.end(), sortPairs);
 
         uint32_t prevTarget = 0;

@@ -19,6 +19,9 @@ SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	outgoing_labels = std::vector<uint32_t >(0);
 
 	// used for random sampling estimator
+	percentage_to_keep = 0.2;
+
+	// used for random sampling estimator
 	reduction_factor = 2.5;
 
 	// ************* variables used by radu's code ***********
@@ -34,6 +37,7 @@ void SimpleEstimator::prepare() {
 			prepareNaive();
 			break;
 		case simpleSampling:
+			prepForRandomSamplingEstimator();
 			break;
 		case biasedSampling:
 			prepForBiasedRandomSamplingEstimation();
@@ -86,7 +90,7 @@ void SimpleEstimator::prepareNaive() {
 	// fill matrices
 	int from = 0;
 	for (const auto & adjElement : graph->adj) {
-		for (const auto &vlPair : adjElement) {
+		for (const auto &vlPair : adjElement.second) {
 			uint8_t label = vlPair.first;
 			incoming_labels[label] = incoming_labels[label] + 1;
 			outgoing_labels[label] = outgoing_labels[label] + 1;
@@ -153,25 +157,33 @@ bool SimpleEstimator::onlyDigits(std::string str) {
 	return (str.find_first_not_of("0123456789") == std::string::npos);
 }
 
-void SimpleEstimator::prepForRandomSamplingEstimator(std::shared_ptr<SimpleGraph> &synopsis) {
+void SimpleEstimator::prepForRandomSamplingEstimator() {
 	//std::cout << "Starting prepareForSimpleSamplingEstimator" << std::endl;
 	float percentage_to_keep = 0.2;
-	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
+	firstSimpleSampledGraph = std::make_shared<SimpleGraph>();
+	firstSimpleSampledGraph->setNoVertices(graph->getNoVertices());
+	firstSimpleSampledGraph->setNoLabels(graph->getNoLabels());
+
+	addEdgesByRandomWalk(firstSimpleSampledGraph, percentage_to_keep, graph->getNoEdges());
+
+	secondSimpleSampledGraph = std::make_shared<SimpleGraph>();
+	secondSimpleSampledGraph->setNoVertices(graph->getNoVertices());
+	secondSimpleSampledGraph->setNoLabels(graph->getNoLabels());
+
+	addEdgesByRandomWalk(firstSimpleSampledGraph, percentage_to_keep, graph->getNoEdges());
+
 }
 
 void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
 	float percentage_to_keep, int no_edges) {
 	//SimpleGraph synopsis = SimpleGraph();
 	// force to resize the graph
-	synopsis->setNoVertices(0);
 
 	//std::cout << "Entering selectSubgraphByRandomWalk" << std::endl;
 	uint32_t no_selected_edges = 0;
 	uint32_t edges_to_select = std::floor(percentage_to_keep * no_edges);
 	//std::cout << "Setting values for synopsis"<< std::endl;
-	//synopsis.s
-	synopsis->setNoVertices(graph->getNoVertices());
-	synopsis->setNoLabels(graph->getNoLabels());
+	//synopsis
 
 	//std::cout << "Number of edges: " << no_edges << std::endl;
 	//std::cout << "Percentage of edges to keep: " << percentage_to_keep << std::endl;
@@ -184,21 +196,18 @@ void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsi
 	float alpha = 0.2;
 
 	// select random node to start the walking
-	while (no_selected_edges < edges_to_select) {
+	while (no_selected_edges < edges_to_select){
 
-		if (std::rand() < alpha) {
+		if (std::rand() < alpha){
 			// teleport by change
 			current_node = std::rand() % (graph->getNoVertices());
-		}
-		else if (graph->adj[current_node].empty()) {
+		} else if (graph->adj[current_node].empty()){
 			// force teleportation
 			current_node = std::rand() % (graph->getNoVertices());
-		}
-		else if (synopsis->adj[current_node].size() >= graph->adj[current_node].size()) {
+		} else if (synopsis->adj[current_node].size() >= graph->adj[current_node].size()){
 			// force teleportation because we already processed all edges here
 			current_node = std::rand() % (graph->getNoVertices());
-		}
-		else {
+		} else {
 			// here we allow duplication
 			int next_pair_pos = std::rand() % (graph->adj[current_node].size());
 			std::pair<uint32_t, uint32_t> selected_pair = graph->adj[current_node][next_pair_pos];
@@ -214,26 +223,21 @@ void SimpleEstimator::addEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsi
 
 cardStat SimpleEstimator::estimateByRandomSampling(RPQTree *q) {
 	//std::cout << "Running simpleSamplingEstimator " << std::endl;
-	auto synopsis = std::make_shared<SimpleGraph>();
-	float percentage_to_keep = 1.0 / reduction_factor;
-
-	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
 	//prepareForSimpleSamplingEstimator(synopsis);
-	SimpleEvaluator eval = SimpleEvaluator(synopsis);
+	SimpleEvaluator eval = SimpleEvaluator(firstSimpleSampledGraph);
 	cardStat firstStats = eval.evaluate(q);
-	firstStats.noPaths = firstStats.noPaths*reduction_factor;
+	firstStats.noPaths = firstStats.noPaths*(1.0/percentage_to_keep);
 	// resize the synopsis object
 	//delete &synopsis;
 
-	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
 	//prepareForSimpleSamplingEstimator(synopsis);
-	eval = SimpleEvaluator(synopsis);
+	eval = SimpleEvaluator(secondSimpleSampledGraph);
 	cardStat secondStats = eval.evaluate(q);
-	secondStats.noPaths = secondStats.noPaths*reduction_factor;
+	secondStats.noPaths = secondStats.noPaths*(1.0/percentage_to_keep);
 
 	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
 
-	return cardStat{ 0, avgNoPaths, 0 };
+	return cardStat{0, avgNoPaths, 0};
 }
 
 void SimpleEstimator::prepForBiasedRandomSamplingEstimation() {
@@ -259,6 +263,7 @@ void SimpleEstimator::prepForBiasedRandomSamplingEstimation() {
 void SimpleEstimator::removeEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &synopsis,
 	float percentage_to_keep) {
 
+
 	//std::cout << "Entering removeEdgesByRandomWalk" << std::endl;
 	uint32_t no_selected_edges = 0;
 	uint32_t edges_to_keep = std::floor(percentage_to_keep * synopsis->getNoEdges());
@@ -270,18 +275,16 @@ void SimpleEstimator::removeEdgesByRandomWalk(std::shared_ptr<SimpleGraph> &syno
 	float alpha = 0.1;
 
 	// select random node to start the walking
-	while (synopsis->getNoEdges() > edges_to_keep) {
+	while (synopsis->getNoEdges() > edges_to_keep){
 		//std::cout << "Edges to keep: " << edges_to_keep << std::endl;
 		//std::cout << "Number of edges: " << synopsis->getNoEdges() << std::endl;
-		if (std::rand() < alpha) {
+		if (std::rand() < alpha){
 			// teleport by change
 			current_node = std::rand() % (synopsis->getNoVertices());
-		}
-		else if (synopsis->adj[current_node].size() <= 1) {
+		} else if (synopsis->adj[current_node].size() <= 1){
 			// force teleportation to avoid destroying weak links
 			current_node = std::rand() % (synopsis->getNoVertices());
-		}
-		else {
+		} else {
 			uint32_t next_pair_pos = std::rand() % (synopsis->adj[current_node].size());
 			std::pair<uint32_t, uint32_t> selected_pair = synopsis->adj[current_node][next_pair_pos];
 			// move current node to target
@@ -307,16 +310,16 @@ cardStat SimpleEstimator::estimateByBiasedRandomSampling(RPQTree *q) {
 	//delete &synopsis;
 
 	/**
-	addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
-	//prepareForSimpleSamplingEstimator(synopsis);
-	eval = SimpleEvaluator(synopsis);
-	cardStat secondStats = eval.evaluate(q);
-	secondStats.noPaths = secondStats.noPaths*reduction_factor;
+    addEdgesByRandomWalk(synopsis, percentage_to_keep, graph->getNoEdges());
+    //prepareForSimpleSamplingEstimator(synopsis);
+    eval = SimpleEvaluator(synopsis);
+    cardStat secondStats = eval.evaluate(q);
+    secondStats.noPaths = secondStats.noPaths*reduction_factor;
 
-	uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
+    uint32_t avgNoPaths = 0.5*(firstStats.noPaths + secondStats.noPaths);
 
-	return cardStat{0, avgNoPaths, 0};
-	**/
+    return cardStat{0, avgNoPaths, 0};
+     **/
 }
 #pragma endregion
 
@@ -334,7 +337,7 @@ void SimpleEstimator::prepareRadu()
 
 	//construct bucket for adj list
 	for (const auto & adjElement : graph->adj) {
-		for (const auto &vlPair : adjElement) {
+		for (const auto &vlPair : adjElement.second) {
 			uint8_t label = vlPair.first;
 			uint32_t node = vlPair.second;
 			bucketsAdj[label].insert(node);
@@ -349,7 +352,7 @@ void SimpleEstimator::prepareRadu()
 
 	//construct bucket for reverse_adj list
 	for (const auto & adjElement : graph->reverse_adj) {
-		for (const auto &vlPair : adjElement) {
+		for (const auto &vlPair : adjElement.second) {
 			uint8_t label = vlPair.first;
 			uint32_t node = vlPair.second;
 			bucketsReverseAdj[label].insert(node);
