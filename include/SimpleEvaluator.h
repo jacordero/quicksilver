@@ -41,9 +41,11 @@ public:
 
     void attachEstimator(std::shared_ptr<SimpleEstimator> &e);
 
-    std::shared_ptr<SimpleGraph> evaluate_aux(RPQTree *q);
+    std::shared_ptr<SimpleGraph> evaluate_aux(RPQTree *q, int depth);
+    std::shared_ptr<SimpleGraph> evaluate_aux_preselected(RPQTree *q, std::set<int> preselectedVertices, int depth);
     static std::shared_ptr<SimpleGraph> project(uint32_t label, bool inverse, std::shared_ptr<SimpleGraph> &g);
-    static std::shared_ptr<SimpleGraph> join(std::shared_ptr<SimpleGraph> &left, std::shared_ptr<SimpleGraph> &right);
+    static std::shared_ptr<SimpleGraph> project_preselected(uint32_t label, bool inverse, std::shared_ptr<SimpleGraph> &g, std::set<int> preselectedVertices);
+    static std::shared_ptr<SimpleGraph> join(std::shared_ptr<SimpleGraph> &left, std::shared_ptr<SimpleGraph> &right, int depth);
 
     static cardStat computeStats(std::shared_ptr<SimpleGraph> &g);
     static std::string treeToString(RPQTree *query);

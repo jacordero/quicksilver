@@ -14,6 +14,10 @@ uint32_t SimpleGraph::getNoVertices() const {
 
 void SimpleGraph::setNoVertices(uint32_t n) {
     V = n;
+    for (int i = 0; i < n; i++){
+        startVertices.insert(i);
+        endVertices.insert(i);
+    }
     //adj.resize(V);
     //reverse_adj.resize(V);
 }
@@ -111,4 +115,71 @@ void SimpleGraph::readFromContiguousFile(const std::string &fileName) {
 
     graphFile.close();
 
+}
+
+void SimpleGraph::setEndVertices(std::set<int> newEndVertices) {
+    endVertices = newEndVertices;
+}
+
+void SimpleGraph::setStartVertices(std::set<int> newStartVertices) {
+    startVertices = newStartVertices;
+}
+
+void SimpleGraph::printStartVertices() {
+    std::cout << "\n** start vertices **\n";
+    std::cout << "length: " << startVertices.size() << std::endl;
+    for (auto element: startVertices){
+        std::cout << element << ", ";
+    }
+    std::cout << "\n";
+}
+
+void SimpleGraph::printEndVertices() {
+    std::cout << "\n** end vertices **\n";
+    std::cout << "length: " << endVertices.size() << std::endl;
+    for (auto element: endVertices){
+        std::cout << element << ", ";
+    }
+    std::cout << "\n";
+}
+
+void SimpleGraph::printGraph(){
+    std::cout << "\n** Graph **\n";
+    for (auto &mapEntry: adj){
+        int source = mapEntry.first;
+        auto labelTargets = mapEntry.second;
+        for (auto labelTarget: labelTargets){
+            auto target = labelTarget.second;
+            std::cout << "(" << source << ", " << target << "),\t";
+        }
+    }
+    std::cout << "\n";
+}
+
+int SimpleGraph::computeEndVertices() {
+    std::set<int> cVertices;
+    for (auto &mapEntry: adj){
+        int source = mapEntry.first;
+        auto labelTargets = mapEntry.second;
+        for (auto labelTarget: labelTargets){
+            auto target = labelTarget.second;
+            cVertices.insert(target);
+        }
+    }
+
+    return cVertices.size();
+}
+
+std::set<int> SimpleGraph::getEndVertices() {
+    std::set<int> cVertices;
+    for (auto &mapEntry: adj){
+        int source = mapEntry.first;
+        auto labelTargets = mapEntry.second;
+        for (auto labelTarget: labelTargets){
+            auto target = labelTarget.second;
+            cVertices.insert(target);
+        }
+    }
+
+    return cVertices;
 }
