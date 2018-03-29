@@ -15,7 +15,7 @@ uint32_t SimpleGraph::getNoVertices() const {
 void SimpleGraph::setNoVertices(uint32_t n) {
     V = n;
     for (int i = 0; i < n; i++){
-        startVertices.insert(i);
+        //startVertices.insert(i);
         endVertices.insert(i);
     }
     //adj.resize(V);

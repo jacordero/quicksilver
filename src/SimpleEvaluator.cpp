@@ -100,7 +100,7 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected(uint32_t proje
 
     //std::cout << "Preselected vertices size: " << preselectedVertices.size() << std::endl;
     std::set<int> newEndVertices;
-    std::set<int> newStartVertices;
+    //std::set<int> newStartVertices;
 
     if(!inverse) {
         // going forward
@@ -118,7 +118,7 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected(uint32_t proje
                 if (label == projectLabel){
                     out->addEdge(source, target, label);
                     newEndVertices.insert(target);
-                    newStartVertices.insert(source);
+                    //newStartVertices.insert(source);
                 }
 
             }
@@ -126,10 +126,12 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected(uint32_t proje
     } else {
         // going backward
         // TODO: implement preselected vertices for backward mode
-        for (auto &mapEntry : in->reverse_adj) {
+        //for (auto &mapEntry : in->reverse_adj) {
+        for (int source: preselectedVertices){
 
-            uint32_t source = mapEntry.first;
-            auto sourceVec = mapEntry.second;
+            //uint32_t source = mapEntry.first;
+            //auto sourceVec = mapEntry.second;
+            auto sourceVec = in->reverse_adj[source];
             for (auto labelTarget : sourceVec) {
 
                 auto label = labelTarget.first;
@@ -138,13 +140,13 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected(uint32_t proje
                 if (label == projectLabel){
                     out->addEdge(source, target, label);
                     newEndVertices.insert(target);
-                    newStartVertices.insert(source);
+                    //newStartVertices.insert(source);
                 }
             }
         }
     }
 
-    out->setStartVertices(newStartVertices);
+    //out->setStartVertices(newStartVertices);
     out->setEndVertices(newEndVertices);
 
     return out;
