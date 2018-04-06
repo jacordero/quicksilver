@@ -11,6 +11,7 @@ SimpleEvaluator::SimpleEvaluator(std::shared_ptr<SimpleGraph> &g) {
     graph = g;
     est = nullptr; // estimator not attached by default
     cache;
+    index;
 }
 
 void SimpleEvaluator::attachEstimator(std::shared_ptr<SimpleEstimator> &e) {
@@ -25,6 +26,9 @@ void SimpleEvaluator::prepare() {
         //std::cout << "Estimator is being prepared\n";
         //est->prepare();
     }
+
+    // create the index
+    createIndex(graph->getNoLabels());
 
     // prepare other things here.., if necessary
 
@@ -299,6 +303,11 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux_preselected(RPQTree *
 
         g = SimpleEvaluator::project_preselected(label, inverse, graph, preselectedVertices);
         //cache.addToCache(q, g);
+        /*
+        if (g->adj.size() == 0){
+            return nullptr;
+        }
+         */
         return g;
     }
 
@@ -318,7 +327,19 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux_preselected(RPQTree *
 
 
         auto leftGraph = SimpleEvaluator::evaluate_aux_preselected(q->left, preselectedVertices, depth+1);
+
+        /*
+        if (leftGraph == nullptr || leftGraph->adj.size() == 0){
+            return nullptr;
+        }
+         */
+
         auto rightGraph = SimpleEvaluator::evaluate_aux_preselected(q->right, leftGraph->endVertices, depth + 1);
+        /*
+        if (rightGraph == nullptr || rightGraph->adj.size() == 0){
+            return nullptr;
+        }
+         */
 
         //std::cout  << std::string(depth, '\t') << "Graph vertices: " << graph->getNoVertices() << std::endl;
         //std::cout  << std::string(depth, '\t') << "Left graph vertices: " << leftGraph->adj.size() << std::endl;
@@ -365,8 +386,19 @@ LRUCache::LRUCache() {
     cache.resize(0);
 }
 
+
+// TODO: reimplement the LRU cache class to make look up easier
+// add a hashtable to keep the query and graphs and let the deque keeps the order
+// of deletion for the graphs and queries
 std::shared_ptr<SimpleGraph> LRUCache::getFromCache(RPQTree *query) {
     std::string queryStr = SimpleEvaluator::treeToString(query);
+    // remove unnecessary brackets
+
+    //std::cout << "Query before normalization: " << queryStr;
+    queryStr.erase(std::remove(queryStr.begin(), queryStr.end(), '('), queryStr.end());
+    queryStr.erase(std::remove(queryStr.begin(), queryStr.end(), ')'), queryStr.end());
+    //std::cout << "Query after normalization: " << queryStr;
+
     std::shared_ptr<SimpleGraph> g = nullptr;
 
     for(int i = 0; i < cache.size(); i++) {
@@ -382,10 +414,56 @@ std::shared_ptr<SimpleGraph> LRUCache::getFromCache(RPQTree *query) {
 
 void LRUCache::addToCache(RPQTree *query, std::shared_ptr<SimpleGraph> &g) {
     std::string queryStr = SimpleEvaluator::treeToString(query);
+
+    //std::cout << "Query before normalization: " << queryStr;
+    queryStr.erase(std::remove(queryStr.begin(), queryStr.end(), '('), queryStr.end());
+    queryStr.erase(std::remove(queryStr.begin(), queryStr.end(), ')'), queryStr.end());
+    //std::cout << "Query after normalization: " << queryStr;
+
     if (cache.size() < maxSize){
         cache.emplace_front(std::make_pair(queryStr, g));
     } else {
         cache.erase(cache.end());
         cache.emplace_front(std::make_pair(queryStr, g));
+    }
+}
+
+
+SimpleIndex::SimpleIndex() {};
+
+std::shared_ptr<SimpleGraph> SimpleIndex::getFromIndex(std::string key) {
+    std::map<std::string, std::shared_ptr<SimpleGraph>>::iterator it;
+    it = index.find(key);
+    if (it != index.end()) {
+        return it->second;
+    } else {
+        return nullptr;
+    }
+}
+
+void SimpleIndex::addToIndex(std::string key, std::shared_ptr<SimpleGraph> &g) {
+    index[key] = g;
+}
+
+void SimpleEvaluator::createIndex(int numberLabels){
+    std::map<std::string, int> labelCount;
+
+    for (int i = 0; i < numberLabels; i++){
+        std::string label = std::to_string(i);
+        std::string fLabel = label + "+";
+        RPQTree* ftree = RPQTree::strToTree(fLabel);
+        auto resf = evaluate_aux(ftree, 0);
+        auto stats = SimpleEvaluator::computeStats(resf);
+        labelCount[fLabel] = stats.noPaths;
+
+        std::string bLabel = label + "-";
+        RPQTree* btree = RPQTree::strToTree(fLabel);
+        auto resb = evaluate_aux(btree, 0);
+        stats = SimpleEvaluator::computeStats(resb);
+        labelCount[bLabel] = stats.noPaths;
+    }
+
+    for (auto pair: labelCount){
+        std::cout << "label: " + pair.first + ", count: " << pair.second << std::endl;
     }
 }

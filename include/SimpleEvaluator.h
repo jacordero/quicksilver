@@ -15,7 +15,7 @@
 
 class LRUCache {
 
-    int maxSize = 40;
+    int maxSize = 20;
     std::deque<std::pair<std::string,std::shared_ptr<SimpleGraph>>> cache;
 
 public:
@@ -25,11 +25,23 @@ public:
     void addToCache(RPQTree *query, std::shared_ptr<SimpleGraph> &g);
 };
 
+class SimpleIndex {
+    std::map<std::string, std::shared_ptr<SimpleGraph>> index;
+
+public:
+    SimpleIndex();
+    ~SimpleIndex() = default;
+    std::shared_ptr<SimpleGraph> getFromIndex(std::string key);
+    void addToIndex(std::string key, std::shared_ptr<SimpleGraph> &g);
+};
+
+
 class SimpleEvaluator : public Evaluator {
 
     LRUCache cache;
     std::shared_ptr<SimpleGraph> graph;
     std::shared_ptr<SimpleEstimator> est;
+    SimpleIndex index;
 
 public:
 
@@ -49,6 +61,7 @@ public:
 
     static cardStat computeStats(std::shared_ptr<SimpleGraph> &g);
     static std::string treeToString(RPQTree *query);
+    void createIndex(int numberLabels);
 
 };
 
