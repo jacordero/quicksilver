@@ -10,11 +10,14 @@
 SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	// variables used by everyone
 	graph = g;
-	estimatorType = radu;
-
+	estimatorType = tables;
+    //cardinalityEstimatorTable
 
 	// ************ variables used by jc's code ******
 	// used for naive estimator implementation
+
+
+
 	incoming_labels = std::vector<uint32_t>(0);
 	outgoing_labels = std::vector<uint32_t >(0);
 
@@ -33,7 +36,11 @@ SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 void SimpleEstimator::prepare() {
 	// do your prep here
 	switch(estimatorType){
-		case naive:
+
+        case tables:
+            prepareTables();
+            break;
+        case naive:
 			prepareNaive();
 			break;
 		case simpleSampling:
@@ -55,6 +62,9 @@ void SimpleEstimator::prepare() {
 cardStat SimpleEstimator::estimate(RPQTree *q){
 	cardStat result = cardStat{0,0,0};
 	switch(estimatorType){
+        case tables:
+            result = estimateUsingTables(q);
+            break;
 		case naive:
 			result = estimateNaive(q);
 		case simpleSampling:
@@ -74,6 +84,120 @@ cardStat SimpleEstimator::estimate(RPQTree *q){
 
 
 #pragma region Jorge
+
+void SimpleEstimator::prepareTables(){
+    int noLabels = graph->getNoLabels();
+	//graph->getNoEdges();
+
+    // initialize values for the cardinality estimator table
+    for (int i = 0; i < noLabels; i++){
+        std::string outgoingLabel = std::to_string(i);
+        std::string incomingLabel = std::to_string(i);
+        outgoingLabel += '+';
+        incomingLabel += '-';
+        cardinalityEstimatorTable[outgoingLabel] = 0;
+        cardinalityEstimatorTable[incomingLabel] = 0;
+    }
+
+
+        // fill outgoing
+    for (const auto & adjElement : graph->adj){
+        for (const auto &vlPair : adjElement.second){
+            uint32_t intLabel = vlPair.first;
+            std::string strLabel = std::to_string(intLabel);
+            strLabel += '+';
+            cardinalityEstimatorTable[strLabel] = cardinalityEstimatorTable[strLabel] + 1;
+        }
+    }
+
+        // fill incoming
+    for (const auto & radjElement : graph->reverse_adj){
+        for (const auto &vlPair : radjElement.second){
+            uint32_t intLabel = vlPair.first;
+            std::string strLabel = std::to_string(intLabel);
+            strLabel += '-';
+            cardinalityEstimatorTable[strLabel] = cardinalityEstimatorTable[strLabel] + 1;
+        }
+    }
+
+	/**
+    for (std::map<std::string,uint32_t>::iterator it=cardinalityEstimatorTable.begin();
+         it!=cardinalityEstimatorTable.end(); ++it){
+        std::cout << it->first << " => " << it->second << '\n';
+    }
+    **/
+
+}
+
+
+
+cardStat SimpleEstimator::estimateUsingTables(RPQTree *q) {
+
+    //std::cout <<"passed tree: ";
+    //q->print();
+    //std::cout <<"\n";
+	// perform your estimation here
+
+	// number of labels must be smaller or equal than the number of edges in the graph
+	smaller_number_labels = graph->getNoEdges() + 1;
+	larger_number_labels = 0;
+	length_query = 0;
+	// iterate
+
+	//std::cout << "Before estimation process" << std::endl;
+	//std::cout << "Smaller number of labels: " << smaller_number_labels << std::endl;
+	//std::cout << "Larger number of labels: " << larger_number_labels << std::endl;
+
+	// iterate over RPQTree data
+	cardStat estimation = traverseRPQTree(q);
+	//iterateRPQTree(q->righ)
+
+	//std::cout << "After estimation process" << std::endl;
+	//std::cout << "Smaller number of labels: " << smaller_number_labels << std::endl;
+	//std::cout << "Larger number of labels: " << larger_number_labels << std::endl;
+
+	// noOut, noPaths, noIn
+	return estimation;
+}
+
+
+cardStat SimpleEstimator::traverseRPQTree(RPQTree *q) {
+    //std::cout << "traverse rpq tree\n";
+	if (q->isLeaf()) {
+        //std::cout << "is leaf\n";
+		char c = (q->data).at(0);
+		std::string str = std::string(1, c);
+		if (onlyDigits(str)) {
+			//std::cout << "label: " << q->data << std::endl;
+			//length_query++;
+			int paths = cardinalityEstimatorTable[q->data];
+            return cardStat{0, paths, 0};
+		}
+	}
+	else {
+        //std::cout <<"is inner node\n";
+
+        cardStat leftEstimation = cardStat{0, 0, 0};
+        cardStat rightEstimation = cardStat{0, 0, 0};
+		if (q->left != nullptr){
+            leftEstimation.noPaths = traverseRPQTree(q->left).noPaths;
+        }
+        if (q->right != nullptr){
+            rightEstimation.noPaths = traverseRPQTree(q->right).noPaths;
+        }
+
+        uint32_t estimatedPaths = static_cast<uint32_t > (std::round((rightEstimation.noPaths + leftEstimation.noPaths) / 2.0 ));
+
+        cardStat estimation = cardStat{0, estimatedPaths, 0};
+        //std::cout << "Right paths: " << rightEstimation.noPaths << std::endl;
+        //std::cout << "Left paths: " << leftEstimation.noPaths << std::endl;
+		//std::cout << "Estimated paths: " << estimatedPaths << std::endl;
+
+        return estimation;
+	}
+}
+
+
 void SimpleEstimator::prepareNaive() {
 	// do your prep here
 	// play a bit with the graph data structure
@@ -91,7 +215,7 @@ void SimpleEstimator::prepareNaive() {
 	int from = 0;
 	for (const auto & adjElement : graph->adj) {
 		for (const auto &vlPair : adjElement.second) {
-			uint8_t label = vlPair.first;
+			uint32_t label = vlPair.first;
 			incoming_labels[label] = incoming_labels[label] + 1;
 			outgoing_labels[label] = outgoing_labels[label] + 1;
 		}

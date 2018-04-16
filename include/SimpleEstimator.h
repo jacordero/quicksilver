@@ -15,10 +15,12 @@ enum EstimatorType {
 	simpleSampling,
 	biasedSampling,
 	radu,
-	bodgan
+	bodgan,
+	tables
 };
 
 class SimpleEstimator : public Estimator {
+
 
 	// used by everyone
 	std::shared_ptr<SimpleGraph> graph;
@@ -47,6 +49,11 @@ public:
 	void prepare() override;
 	cardStat estimate(RPQTree *q) override;
 
+	/** Used by tables estimator **/
+	void prepareTables();
+	cardStat estimateUsingTables(RPQTree *q);
+	cardStat traverseRPQTree(RPQTree *q);
+
 	/** used by the naive estimator **/
 	void prepareNaive();
 	cardStat estimateNaive(RPQTree *q);
@@ -74,6 +81,10 @@ public:
 	std::map<uint32_t, std::set<uint32_t>> bucketsAdj;
 	std::map<uint32_t, std::set<uint32_t>> bucketsReverseAdj;
 	std::shared_ptr<SimpleGraph> estimatedGraphRadu;
+
+	// used by join estimator
+	std::map<std::string, uint32_t> cardinalityEstimatorTable;
+
 
 	template <typename T>
 	std::pair<T, bool> getNthElement(std::set<T> & searchSet, int n);
