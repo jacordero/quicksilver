@@ -745,7 +745,7 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
     //std::cout << "pivot index position: " << pivotPosition << std::endl;
     //std::cout << "pivot index value: " << tokens[pivotPosition] << std::endl;
 
-    bool useNewEvaluationMethod = false;
+    bool useNewEvaluationMethod = true;
 
     if (!useNewEvaluationMethod){
         //std::cout << "DEBUG: Execute old evaluation query procedure" << std::endl;
