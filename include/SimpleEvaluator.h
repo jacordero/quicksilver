@@ -15,7 +15,7 @@
 
 class LRUCache {
 
-    int maxSize = 20;
+    int maxSize = 40;
     std::deque<std::pair<std::string,std::shared_ptr<SimpleGraph>>> cache;
 
 public:
@@ -42,6 +42,7 @@ class SimpleEvaluator : public Evaluator {
     std::shared_ptr<SimpleGraph> graph;
     std::shared_ptr<SimpleEstimator> est;
     SimpleIndex index;
+    bool enableCache;
 
 public:
 

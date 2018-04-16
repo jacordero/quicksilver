@@ -12,6 +12,7 @@ SimpleEvaluator::SimpleEvaluator(std::shared_ptr<SimpleGraph> &g) {
     est = nullptr; // estimator not attached by default
     cache;
     index;
+    enableCache = true;
 }
 
 void SimpleEvaluator::attachEstimator(std::shared_ptr<SimpleEstimator> &e) {
@@ -365,12 +366,16 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
 std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux(RPQTree *q, int depth) {
 
     // evaluate according to the AST bottom-up
-
-    std::shared_ptr<SimpleGraph> g = cache.getFromCache(q);
-    if (g != nullptr){
-        //std::cout << "Cache hit: " << treeToString(q) <<"\n";
-        return g;
+    std::shared_ptr<SimpleGraph> g = nullptr;
+    /**
+    if (enableCache){
+        g = cache.getFromCache(q);
+        if (g != nullptr){
+            //std::cout << "Cache hit: " << treeToString(q) <<"\n";
+            return g;
+        }
     }
+     **/
 
     if(q->isLeaf()) {
         //std::cout << std::string(depth, '\t') <<  "Is leaf: " << q->data << std::endl;
@@ -396,7 +401,13 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux(RPQTree *q, int depth
         }
 
         g = SimpleEvaluator::project(label, inverse, graph);
-        cache.addToCache(q, g);
+
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
+        }
+         **/
+
         return g;
     }
 
@@ -429,7 +440,12 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux(RPQTree *q, int depth
         //g->printGraph();
         //g->printStartVertices();
         //g->printEndVertices();
-        cache.addToCache(q, g);
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
+        }
+         **/
+
         return g;
     }
 
@@ -439,11 +455,14 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux(RPQTree *q, int depth
 std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux_preselected(RPQTree *q, std::set<int> preselectedVertices, int depth) {
 
     // evaluate according to the AST bottom-up
-    std::shared_ptr<SimpleGraph> g = nullptr;// = cache.getFromCache(q);
+    std::shared_ptr<SimpleGraph> g = nullptr;// =
+
     /**
-    if (g != nullptr){
-        //std::cout << "Cache hit: " << treeToString(q) <<"\n";
-        return g;
+    if (enableCache){
+        g = cache.getFromCache(q);
+        if (g != nullptr){
+            return g;
+        }
     }
      **/
 
@@ -471,7 +490,13 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux_preselected(RPQTree *
         }
 
         g = SimpleEvaluator::project_preselected(label, inverse, graph, preselectedVertices);
-        //cache.addToCache(q, g);
+
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
+        }
+         **/
+
         /*
         if (g->adj.size() == 0){
             return nullptr;
@@ -521,7 +546,13 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_aux_preselected(RPQTree *
         //g->printGraph();
         //g->printStartVertices();
         //g->printEndVertices();
-        //cache.addToCache(q, g);
+
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
+        }
+         **/
+
         return g;
     }
 
@@ -534,11 +565,14 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_left_tree
                                                                                  int depth) {
 
     // evaluate according to the AST bottom-up
-    std::shared_ptr<SimpleGraph> g = nullptr;// = cache.getFromCache(q);
+    std::shared_ptr<SimpleGraph> g = nullptr;//
     /**
-    if (g != nullptr){
-        //std::cout << "Cache hit: " << treeToString(q) <<"\n";
-        return g;
+    if (enableCache){
+        g = cache.getFromCache(q);
+        if (g != nullptr){
+            //std::cout << "Cache hit: " << treeToString(q) <<"\n";
+            return g;
+        }
     }
      **/
 
@@ -566,12 +600,12 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_left_tree
         }
 
         g = SimpleEvaluator::project_preselected_for_left_tree(label, inverse, graph, preselectedSourceVertices);
-        //cache.addToCache(q, g);
-        /*
-        if (g->adj.size() == 0){
-            return nullptr;
+
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
         }
-         */
+         **/
         //std::cout << "DEBUG: "  << std::string(depth, '\t') << "projected graph start vertices: " << g->startVertices.size() << std::endl;
 
         return g;
@@ -620,7 +654,12 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_left_tree
         //g->printGraph();
         //g->printStartVertices();
         //g->printEndVertices();
-        //cache.addToCache(q, g);
+        /**
+        if (enableCache) {
+            cache.addToCache(q, g);
+        }
+         **/
+
         return g;
     }
 
@@ -632,13 +671,18 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_right_tre
                                                                                   std::set<int> preselectedVertices,
                                                                                   int depth) {
     // evaluate according to the AST bottom-up
-    std::shared_ptr<SimpleGraph> g = nullptr;// = cache.getFromCache(q);
+    std::shared_ptr<SimpleGraph> g = nullptr;
+
     /**
-    if (g != nullptr){
-        //std::cout << "Cache hit: " << treeToString(q) <<"\n";
-        return g;
+    if (enableCache){
+        g = cache.getFromCache(q);
+        if (g != nullptr){
+            //std::cout << "Cache hit: " << treeToString(q) <<"\n";
+            return g;
+        }
     }
-     **/
+    **/
+
 
     if(q->isLeaf()) {
         //std::cout  << std::string(depth, '\t') << "DEBUG: Is leaf: " << q->data << std::endl;
@@ -666,7 +710,12 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_right_tre
         g = SimpleEvaluator::project_preselected_for_right_tree(label, inverse, graph, preselectedVertices);
         //std::cout  << std::string(depth, '\t') << "DEBUG: projected graph end vertices: " << g->endVertices.size() << std::endl;
 
-        //cache.addToCache(q, g);
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
+        }
+         **/
+
         /*
         if (g->adj.size() == 0){
             return nullptr;
@@ -718,7 +767,12 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_right_tre
         //g->printGraph();
         //g->printStartVertices();
         //g->printEndVertices();
-        //cache.addToCache(q, g);
+        /**
+        if (enableCache){
+            cache.addToCache(q, g);
+        }
+         **/
+
         return g;
     }
 
@@ -745,13 +799,23 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
     //std::cout << "pivot index position: " << pivotPosition << std::endl;
     //std::cout << "pivot index value: " << tokens[pivotPosition] << std::endl;
 
-    bool useNewEvaluationMethod = true;
+    bool useNewEvaluationMethod = false;
+
+    if (enableCache){
+        auto result = cache.getFromCache(query);
+        if (result != nullptr){
+            return SimpleEvaluator::computeStats(result);
+        }
+    }
 
     if (!useNewEvaluationMethod){
         //std::cout << "DEBUG: Execute old evaluation query procedure" << std::endl;
 
         //std::cout << "DEBUG: Estimated paths: " << estimation.noPaths << std::endl;
         auto res = evaluate_aux_preselected(query, graph->endVertices, 0);
+        if (enableCache){
+            cache.addToCache(query, res);
+        }
         return SimpleEvaluator::computeStats(res);
     } else {
 
@@ -776,6 +840,10 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             auto leftGraph = evaluate_preselected_for_left_tree(leftTreeQuery, rightGraph->startVertices, 0);
 
             auto finalGraph = join(leftGraph, rightGraph, 0);
+            if (enableCache){
+                cache.addToCache(query, finalGraph);
+            }
+
             cardStat stats = SimpleEvaluator::computeStats(finalGraph);
             //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
             return stats;
@@ -811,6 +879,10 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             //std::cout << "Final right graph start vertices: " << rightGraph->startVertices.size() << std::endl;
 
             auto finalGraph = join(leftGraph, rightGraph, 0);
+            if (enableCache){
+                cache.addToCache(query, finalGraph);
+            }
+
             //std::cout << "start compute stats: " << std::endl;
             cardStat stats = SimpleEvaluator::computeStats(finalGraph);
             //std::cout << "end compute stats: " << std::endl;
@@ -859,6 +931,9 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
 
             auto lmGraph = join(leftGraph, middleGraph, 0);
             auto finalGraph = join(lmGraph, rightGraph, 0);
+            if (enableCache){
+                cache.addToCache(query, finalGraph);
+            }
 
             cardStat stats = SimpleEvaluator::computeStats(finalGraph);
             //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
