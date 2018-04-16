@@ -170,7 +170,7 @@ cardStat SimpleEstimator::traverseRPQTree(RPQTree *q) {
 		if (onlyDigits(str)) {
 			//std::cout << "label: " << q->data << std::endl;
 			//length_query++;
-			int paths = cardinalityEstimatorTable[q->data];
+			uint32_t paths = cardinalityEstimatorTable[q->data];
             return cardStat{0, paths, 0};
 		}
 	}

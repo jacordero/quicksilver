@@ -745,124 +745,127 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
     //std::cout << "pivot index position: " << pivotPosition << std::endl;
     //std::cout << "pivot index value: " << tokens[pivotPosition] << std::endl;
 
-    bool useNewEvaluationMethod = true;
+    bool useNewEvaluationMethod = false;
 
-    if (pivotPosition == tokens.size() - 1){
-        //std::cout << "Execute plan for case 1" << std::endl;
-
-        std::string strForTree = "";
-        int limit = tokens.size() - 2;
-        for (int i = 0; i < limit; i++){
-            strForTree += tokens[i];
-            strForTree += "/";
-        }
-        strForTree += tokens[limit];
-
-        // create query treeRPQTree::strToTree(query.path)
-        RPQTree* rightTreeQuery = RPQTree::strToTree(tokens[tokens.size() - 1]);
-        auto rightGraph = evaluate_aux_preselected(rightTreeQuery, graph->endVertices, 0);
-        //std::cout << "Right graph size: " << rightGraph->getNoEdges() << std::endl;
-        //std::cout << "Right graph start vertices: " << rightGraph->startVertices.size() << std::endl;
-
-        RPQTree* leftTreeQuery = RPQTree::strToTree(strForTree);
-        auto leftGraph = evaluate_preselected_for_left_tree(leftTreeQuery, rightGraph->startVertices, 0);
-
-        auto finalGraph = join(leftGraph, rightGraph, 0);
-        cardStat stats = SimpleEvaluator::computeStats(finalGraph);
-        //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
-        return stats;
-    } else if (pivotPosition == 1) {
-        //std::cout << "Execute old evaluation query procedure" << std::endl;
-
-        std::string strForRightTree = "";
-        for (int i = 2; i < tokens.size(); i++){
-            strForRightTree += "(";
-        }
-
-        for (int i = 1; i < tokens.size() - 1; i++){
-
-            strForRightTree += tokens[i];
-            if (i >= 2){
-                strForRightTree += ")";
-            }
-            strForRightTree += "/";
-        }
-        strForRightTree += tokens[tokens.size() - 1];
-        strForRightTree += ")";
-        //std::cout << "string for right query: " + strForRightTree << std::endl;
-
-        RPQTree* leftTreeQuery = RPQTree::strToTree(tokens[0]);
-        auto leftGraph = evaluate_aux_preselected(leftTreeQuery, graph->endVertices, 0);
-
-        RPQTree* rightTreeQuery = RPQTree::strToTree(strForRightTree);
-        auto rightGraph = evaluate_preselected_for_right_tree(rightTreeQuery, leftGraph->endVertices, 0);
-
-        //std::cout << "Final left graph size: " << leftGraph->getNoEdges() << std::endl;
-        //std::cout << "Final left graph end vertices: " << leftGraph->endVertices.size() << std::endl;
-        //std::cout << "Final right graph size: " << rightGraph->getNoEdges() << std::endl;
-        //std::cout << "Final right graph start vertices: " << rightGraph->startVertices.size() << std::endl;
-
-        auto finalGraph = join(leftGraph, rightGraph, 0);
-        //std::cout << "start compute stats: " << std::endl;
-        cardStat stats = SimpleEvaluator::computeStats(finalGraph);
-        //std::cout << "end compute stats: " << std::endl;
-        //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
-        return stats;
-
-    } else if (useNewEvaluationMethod) {
-
-        //std::cout << "DEBUG: Execute plan for case 3" << std::endl;
-
-        RPQTree* middleQueryTree = RPQTree::strToTree(tokens[pivotPosition]);
-
-        std::string strForLeftTree = "";
-        int limit = tokens.size() - 2;
-        for (int i = 0; i < pivotPosition - 1; i++){
-            strForLeftTree += tokens[i];
-            strForLeftTree += "/";
-        }
-        strForLeftTree += tokens[pivotPosition - 1];
-        //std::cout << "DEBUG: string for left query: " + strForLeftTree << std::endl;
-        RPQTree* leftQueryTree = RPQTree::strToTree(strForLeftTree);
-
-        // construct string for right query
-        std::string strForRightTree = "";
-        for (int i = pivotPosition + 1; i < tokens.size() - 1; i++){
-            strForRightTree += "(";
-        }
-
-        for (int i = pivotPosition + 1; i < tokens.size() - 1; i++){
-            strForRightTree += tokens[i];
-            if (i >= pivotPosition + 2){
-                strForRightTree += ")";
-            }
-            strForRightTree += "/";
-        }
-        strForRightTree += tokens[tokens.size() - 1];
-        strForRightTree += ")";
-        //std::cout << "DEBUG: string for right query: " + strForRightTree << std::endl;
-        RPQTree* rightQueryTree = RPQTree::strToTree(strForRightTree);
-
-        auto middleGraph = evaluate_aux_preselected(middleQueryTree, graph->endVertices, 0);
-        auto leftGraph = evaluate_preselected_for_left_tree(leftQueryTree, middleGraph->startVertices, 0);
-        auto rightGraph = evaluate_preselected_for_right_tree(rightQueryTree, middleGraph->endVertices, 0);
-
-        //std::cout << "DEBUG: Left graph size: " << leftGraph->getNoEdges() << std::endl;
-        //std::cout << "DEBUG: Middle graph size: " << middleGraph->getNoEdges() << std::endl;
-        //std::cout << "DEBUG: Right graph size: " << rightGraph->getNoEdges() << std::endl;
-
-        auto lmGraph = join(leftGraph, middleGraph, 0);
-        auto finalGraph = join(lmGraph, rightGraph, 0);
-
-        cardStat stats = SimpleEvaluator::computeStats(finalGraph);
-        //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
-        return stats;
-    } else {
+    if (!useNewEvaluationMethod){
         //std::cout << "DEBUG: Execute old evaluation query procedure" << std::endl;
 
         //std::cout << "DEBUG: Estimated paths: " << estimation.noPaths << std::endl;
         auto res = evaluate_aux_preselected(query, graph->endVertices, 0);
         return SimpleEvaluator::computeStats(res);
+    } else {
+
+        if (pivotPosition == tokens.size() - 1){
+            //std::cout << "Execute plan for case 1" << std::endl;
+
+            std::string strForTree = "";
+            int limit = tokens.size() - 2;
+            for (int i = 0; i < limit; i++){
+                strForTree += tokens[i];
+                strForTree += "/";
+            }
+            strForTree += tokens[limit];
+
+            // create query treeRPQTree::strToTree(query.path)
+            RPQTree* rightTreeQuery = RPQTree::strToTree(tokens[tokens.size() - 1]);
+            auto rightGraph = evaluate_aux_preselected(rightTreeQuery, graph->endVertices, 0);
+            //std::cout << "Right graph size: " << rightGraph->getNoEdges() << std::endl;
+            //std::cout << "Right graph start vertices: " << rightGraph->startVertices.size() << std::endl;
+
+            RPQTree* leftTreeQuery = RPQTree::strToTree(strForTree);
+            auto leftGraph = evaluate_preselected_for_left_tree(leftTreeQuery, rightGraph->startVertices, 0);
+
+            auto finalGraph = join(leftGraph, rightGraph, 0);
+            cardStat stats = SimpleEvaluator::computeStats(finalGraph);
+            //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
+            return stats;
+        } else if (pivotPosition == 1) {
+            //std::cout << "Execute old evaluation query procedure" << std::endl;
+
+            std::string strForRightTree = "";
+            for (int i = 2; i < tokens.size(); i++){
+                strForRightTree += "(";
+            }
+
+            for (int i = 1; i < tokens.size() - 1; i++){
+
+                strForRightTree += tokens[i];
+                if (i >= 2){
+                    strForRightTree += ")";
+                }
+                strForRightTree += "/";
+            }
+            strForRightTree += tokens[tokens.size() - 1];
+            strForRightTree += ")";
+            //std::cout << "string for right query: " + strForRightTree << std::endl;
+
+            RPQTree* leftTreeQuery = RPQTree::strToTree(tokens[0]);
+            auto leftGraph = evaluate_aux_preselected(leftTreeQuery, graph->endVertices, 0);
+
+            RPQTree* rightTreeQuery = RPQTree::strToTree(strForRightTree);
+            auto rightGraph = evaluate_preselected_for_right_tree(rightTreeQuery, leftGraph->endVertices, 0);
+
+            //std::cout << "Final left graph size: " << leftGraph->getNoEdges() << std::endl;
+            //std::cout << "Final left graph end vertices: " << leftGraph->endVertices.size() << std::endl;
+            //std::cout << "Final right graph size: " << rightGraph->getNoEdges() << std::endl;
+            //std::cout << "Final right graph start vertices: " << rightGraph->startVertices.size() << std::endl;
+
+            auto finalGraph = join(leftGraph, rightGraph, 0);
+            //std::cout << "start compute stats: " << std::endl;
+            cardStat stats = SimpleEvaluator::computeStats(finalGraph);
+            //std::cout << "end compute stats: " << std::endl;
+            //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
+            return stats;
+
+        } else {
+
+            RPQTree* middleQueryTree = RPQTree::strToTree(tokens[pivotPosition]);
+
+            std::string strForLeftTree = "";
+            int limit = tokens.size() - 2;
+            for (int i = 0; i < pivotPosition - 1; i++){
+                strForLeftTree += tokens[i];
+                strForLeftTree += "/";
+            }
+            strForLeftTree += tokens[pivotPosition - 1];
+            //std::cout << "DEBUG: string for left query: " + strForLeftTree << std::endl;
+            RPQTree* leftQueryTree = RPQTree::strToTree(strForLeftTree);
+
+            // construct string for right query
+            std::string strForRightTree = "";
+            for (int i = pivotPosition + 1; i < tokens.size() - 1; i++){
+                strForRightTree += "(";
+            }
+
+            for (int i = pivotPosition + 1; i < tokens.size() - 1; i++){
+                strForRightTree += tokens[i];
+                if (i >= pivotPosition + 2){
+                    strForRightTree += ")";
+                }
+                strForRightTree += "/";
+            }
+            strForRightTree += tokens[tokens.size() - 1];
+            strForRightTree += ")";
+            //std::cout << "DEBUG: string for right query: " + strForRightTree << std::endl;
+            RPQTree* rightQueryTree = RPQTree::strToTree(strForRightTree);
+
+            auto middleGraph = evaluate_aux_preselected(middleQueryTree, graph->endVertices, 0);
+            auto leftGraph = evaluate_preselected_for_left_tree(leftQueryTree, middleGraph->startVertices, 0);
+            auto rightGraph = evaluate_preselected_for_right_tree(rightQueryTree, middleGraph->endVertices, 0);
+
+            //std::cout << "DEBUG: Left graph size: " << leftGraph->getNoEdges() << std::endl;
+            //std::cout << "DEBUG: Middle graph size: " << middleGraph->getNoEdges() << std::endl;
+            //std::cout << "DEBUG: Right graph size: " << rightGraph->getNoEdges() << std::endl;
+
+            auto lmGraph = join(leftGraph, middleGraph, 0);
+            auto finalGraph = join(lmGraph, rightGraph, 0);
+
+            cardStat stats = SimpleEvaluator::computeStats(finalGraph);
+            //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
+            return stats;
+
+        }
+
     }
 }
 
