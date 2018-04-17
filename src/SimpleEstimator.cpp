@@ -10,7 +10,7 @@
 SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	// variables used by everyone
 	graph = g;
-	estimatorType = tables;
+	estimatorType = histogram;
     //cardinalityEstimatorTable
 
 	// ************ variables used by jc's code ******
@@ -30,6 +30,8 @@ SimpleEstimator::SimpleEstimator(std::shared_ptr<SimpleGraph> &g) {
 	// ************* variables used by radu's code ***********
 	constructorRadu(g);
 	// ************* variables used by bodgan's code ************
+
+	bucketsPerHistogram = 10;
 }
 
 
@@ -37,8 +39,8 @@ void SimpleEstimator::prepare() {
 	// do your prep here
 	switch(estimatorType){
 
-        case tables:
-            prepareTables();
+        case histogram:
+            prepareHistogram();
             break;
         case naive:
 			prepareNaive();
@@ -62,8 +64,7 @@ void SimpleEstimator::prepare() {
 cardStat SimpleEstimator::estimate(RPQTree *q){
 	cardStat result = cardStat{0,0,0};
 	switch(estimatorType){
-        case tables:
-            result = estimateUsingTables(q);
+        case histogram:
             break;
 		case naive:
 			result = estimateNaive(q);
@@ -85,20 +86,157 @@ cardStat SimpleEstimator::estimate(RPQTree *q){
 
 #pragma region Jorge
 
-void SimpleEstimator::prepareTables(){
+void SimpleEstimator::prepareHistogram(){
     int noLabels = graph->getNoLabels();
 	//graph->getNoEdges();
 
     // initialize values for the cardinality estimator table
-    for (int i = 0; i < noLabels; i++){
+
+	uint32_t vertices = graph->getNoVertices();
+	uint32_t sizeOfBuckets = vertices/bucketsPerHistogram;
+
+	uint32_t start = 0;
+	uint32_t end = 0;
+	for (int i = 0; i < bucketsPerHistogram; i++){
+		start = i*sizeOfBuckets;
+		if (i < bucketsPerHistogram - 1){
+			end = ((i+1)*sizeOfBuckets) - 1;
+		} else {
+			end = vertices - 1;
+		}
+		histogramInfo[i] = std::make_pair(start, end);
+	}
+
+	// prepare histograms
+	for (int i = 0; i < noLabels; i++){
+		std::string forwardLabel = std::to_string(i);
+		std::string reverseLabel = std::to_string(i);
+		forwardLabel += '+';
+		reverseLabel += '-';
+		std::vector<uint32_t> forwardOutgoing(bucketsPerHistogram);
+		std::vector<uint32_t> forwardIncoming(bucketsPerHistogram);
+		std::vector<uint32_t> backwardOutgoing(bucketsPerHistogram);
+		std::vector<uint32_t> backwardIncoming(bucketsPerHistogram);
+
+		outgoingHistograms[forwardLabel] = forwardOutgoing;
+		outgoingHistograms[reverseLabel] = backwardOutgoing;
+		incomingHistograms[forwardLabel] = forwardIncoming;
+		incomingHistograms[reverseLabel] = backwardIncoming;
+	}
+
+
+	// fill forward elements
+	for (const auto & adjElement : graph->adj){
+		uint32_t source = adjElement.first;
+		for (const auto &vlPair : adjElement.second){
+			uint32_t intLabel = vlPair.first;
+			uint32_t  target = vlPair.second;
+			std::string strLabel = std::to_string(intLabel);
+			strLabel += '+';
+
+			// fill outgoing elements
+			//uint32_t bucketPos = 0;
+			for (auto bucketInfo: histogramInfo){
+				int bucketId = bucketInfo.first;
+				auto range = bucketInfo.second;
+				if (source >= range.first && source <= range.second){
+					outgoingHistograms[strLabel][bucketId] += 1;
+				}
+			}
+
+			// fill incoming elements
+			for (auto bucketInfo: histogramInfo){
+				int bucketId = bucketInfo.first;
+				auto range = bucketInfo.second;
+				if (target >= range.first && target <= range.second){
+					incomingHistograms[strLabel][bucketId] += 1;
+				}
+			}
+
+			cardinalityEstimatorTable[strLabel] = cardinalityEstimatorTable[strLabel] + 1;
+		}
+	}
+
+	// fill incoming
+	for (const auto & radjElement : graph->reverse_adj){
+		uint32_t source = radjElement.first;
+		for (const auto &vlPair : radjElement.second){
+			uint32_t intLabel = vlPair.first;
+			uint32_t  target = vlPair.second;
+			std::string strLabel = std::to_string(intLabel);
+			strLabel += '-';
+
+			// fill outgoing elements
+			//uint32_t bucketPos = 0;
+			for (auto bucketInfo: histogramInfo){
+				int bucketId = bucketInfo.first;
+				auto range = bucketInfo.second;
+				if (source >= range.first && source <= range.second){
+					outgoingHistograms[strLabel][bucketId] += 1;
+				}
+			}
+
+			// fill incoming elements
+			for (auto bucketInfo: histogramInfo){
+				int bucketId = bucketInfo.first;
+				auto range = bucketInfo.second;
+				if (target >= range.first && target <= range.second){
+					incomingHistograms[strLabel][bucketId] += 1;
+				}
+			}
+
+			cardinalityEstimatorTable[strLabel] = cardinalityEstimatorTable[strLabel] + 1;
+		}
+
+	}
+
+	std::vector<std::string> labels;
+	for (auto keyValue: outgoingHistograms){
+		auto label = keyValue.first;
+		labels.emplace_back(label);
+	}
+
+	// print computed histograms
+    /**
+	for (auto label: labels){
+		std::cout << "\nlabel: " << label << std::endl;
+		std::cout << "outgoing: " <<std::endl;
+
+		uint32_t sumOutgoing = 0;
+		uint32_t counter = 0;
+		for (auto bucketCount: outgoingHistograms[label]){
+			auto bucketInfo = histogramInfo[counter];
+			std::cout <<"\t first: " << bucketInfo.first << ", last: " << bucketInfo.second << ", count: " << bucketCount << std::endl;
+			sumOutgoing += bucketCount;
+			counter++;
+		}
+
+		std::cout << "\nincoming: " << std::endl;
+		uint32_t  sumIncoming = 0;
+		counter = 0;
+		for (auto bucketCount: incomingHistograms[label]){
+			auto bucketInfo = histogramInfo[counter];
+			std::cout <<"\t first: " << bucketInfo.first << ", last: " << bucketInfo.second << ", count: " << bucketCount << std::endl;
+			sumIncoming += bucketCount;
+			counter++;
+		}
+
+		std::cout << "\ntotal outgoing: " << sumOutgoing << ", total incoming: " << sumIncoming << std::endl;
+	}
+    **/
+
+	/**
+	std::vector<std::string> joinTokens;
+	for (int i = 0; i < noLabels; i++){
         std::string outgoingLabel = std::to_string(i);
         std::string incomingLabel = std::to_string(i);
         outgoingLabel += '+';
         incomingLabel += '-';
         cardinalityEstimatorTable[outgoingLabel] = 0;
         cardinalityEstimatorTable[incomingLabel] = 0;
+		joinTokens.emplace_back(outgoingLabel);
+		joinTokens.emplace_back(incomingLabel);
     }
-
 
         // fill outgoing
     for (const auto & adjElement : graph->adj){
@@ -119,47 +257,52 @@ void SimpleEstimator::prepareTables(){
             cardinalityEstimatorTable[strLabel] = cardinalityEstimatorTable[strLabel] + 1;
         }
     }
+	**/
 
+
+	// compute values for joins of two nodes
+	/**
+	for (auto firstToken: joinTokens){
+		for(auto secondToken: joinTokens){
+			std::string queryStr = firstToken + "/" + secondToken;
+			RPQTree* query = RPQTree::strToTree(queryStr);
+			auto ev = std::make_unique<SimpleEvaluator>(graph);
+			cardStat stats = ev->evaluate(query);
+			delete(ev);
+			cardinalityEstimatorTable[queryStr] = stats.noPaths;
+		}
+	}
+	 **/
 	/**
     for (std::map<std::string,uint32_t>::iterator it=cardinalityEstimatorTable.begin();
          it!=cardinalityEstimatorTable.end(); ++it){
         std::cout << it->first << " => " << it->second << '\n';
     }
     **/
-
 }
 
-
-
-cardStat SimpleEstimator::estimateUsingTables(RPQTree *q) {
-
-    //std::cout <<"passed tree: ";
-    //q->print();
-    //std::cout <<"\n";
-	// perform your estimation here
-
-	// number of labels must be smaller or equal than the number of edges in the graph
-	smaller_number_labels = graph->getNoEdges() + 1;
-	larger_number_labels = 0;
-	length_query = 0;
-	// iterate
-
-	//std::cout << "Before estimation process" << std::endl;
-	//std::cout << "Smaller number of labels: " << smaller_number_labels << std::endl;
-	//std::cout << "Larger number of labels: " << larger_number_labels << std::endl;
-
-	// iterate over RPQTree data
-	cardStat estimation = traverseRPQTree(q);
-	//iterateRPQTree(q->righ)
-
-	//std::cout << "After estimation process" << std::endl;
-	//std::cout << "Smaller number of labels: " << smaller_number_labels << std::endl;
-	//std::cout << "Larger number of labels: " << larger_number_labels << std::endl;
-
-	// noOut, noPaths, noIn
-	return estimation;
+cardStat SimpleEstimator::estimateJoinSize(std::string leftLabel, std::string rightLabel){
+	uint32_t total = 0;
+	cardStat result = cardStat{0, 0, 0};
+	std::vector<uint32_t> leftTargets = incomingHistograms[leftLabel];
+	std::vector<uint32_t> rightSources = outgoingHistograms[rightLabel];
+	for (uint32_t bucketId = 0; bucketId < bucketsPerHistogram; bucketId++){
+		total += (leftTargets[bucketId] + rightSources[bucketId])/2;
+	}
+	result.noPaths = total;
+	return result;
 }
 
+cardStat SimpleEstimator::estimateLeafSize(std::string label){
+	uint32_t total = 0;
+	cardStat result = cardStat{0, 0, 0};
+	std::vector<uint32_t> rightSources = outgoingHistograms[label];
+	for (uint32_t bucketId = 0; bucketId < bucketsPerHistogram; bucketId++){
+		total += rightSources[bucketId];
+	}
+	result.noPaths = total;
+	return result;
+}
 
 cardStat SimpleEstimator::traverseRPQTree(RPQTree *q) {
     //std::cout << "traverse rpq tree\n";

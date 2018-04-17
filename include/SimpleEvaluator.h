@@ -44,6 +44,7 @@ class SimpleEvaluator : public Evaluator {
     SimpleIndex index;
     bool enableCache;
     bool smartEnabled;
+    int plannerType;
 
 public:
 

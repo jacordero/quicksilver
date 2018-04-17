@@ -16,7 +16,7 @@ enum EstimatorType {
 	biasedSampling,
 	radu,
 	bodgan,
-	tables
+	histogram
 };
 
 class SimpleEstimator : public Estimator {
@@ -50,8 +50,11 @@ public:
 	cardStat estimate(RPQTree *q) override;
 
 	/** Used by tables estimator **/
-	void prepareTables();
-	cardStat estimateUsingTables(RPQTree *q);
+	void prepareHistogram();
+	//cardStat estimateUsingTables(RPQTree *q);
+    cardStat estimateJoinSize(std::string leftToken, std::string rightToken);
+	cardStat estimateLeafSize(std::string token);
+
 	cardStat traverseRPQTree(RPQTree *q);
 
 	/** used by the naive estimator **/
@@ -84,7 +87,10 @@ public:
 
 	// used by join estimator
 	std::map<std::string, uint32_t> cardinalityEstimatorTable;
-
+    std::map<uint32_t , std::pair<uint32_t, uint32_t>> histogramInfo;
+	std::map<std::string, std::vector<uint32_t>> outgoingHistograms;
+    std::map<std::string, std::vector<uint32_t>> incomingHistograms;
+    int bucketsPerHistogram;
 
 	template <typename T>
 	std::pair<T, bool> getNthElement(std::set<T> & searchSet, int n);

@@ -15,6 +15,7 @@ SimpleEvaluator::SimpleEvaluator(std::shared_ptr<SimpleGraph> &g) {
     index;
     enableCache = false;
     smartEnabled = true;
+    plannerType = 1;
 }
 
 void SimpleEvaluator::attachEstimator(std::shared_ptr<SimpleEstimator> &e) {
@@ -307,23 +308,24 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::join(std::shared_ptr<SimpleGraph> 
     std::set<int> newEndVertices;
     std::set<int> newStartVertices;
 
-    for(auto &mapEntry: left->adj){
+        for(auto &mapEntry: left->adj){
 
-        uint32_t leftSource = mapEntry.first;
-        auto leftSourceVec = mapEntry.second;
-        for (auto labelTarget : leftSourceVec) {
+            uint32_t leftSource = mapEntry.first;
+            auto leftSourceVec = mapEntry.second;
+            for (auto labelTarget : leftSourceVec) {
 
-            int leftTarget = labelTarget.second;
-            // try to join the left target with right source
-            for (auto rightLabelTarget : right->adj[leftTarget]) {
+                int leftTarget = labelTarget.second;
+                // try to join the left target with right source
+                for (auto rightLabelTarget : right->adj[leftTarget]) {
 
-                auto rightTarget = rightLabelTarget.second;
-                out->addEdge(leftSource, rightTarget, 0);
-                newEndVertices.insert(rightTarget);
-                newStartVertices.insert(leftSource);
+                    auto rightTarget = rightLabelTarget.second;
+                    out->addEdge(leftSource, rightTarget, 0);
+                    //std::make_pair(edgeLabel, to)
+                    newEndVertices.insert(rightTarget);
+                    newStartVertices.insert(leftSource);
+                }
             }
         }
-    }
 
     out->setStartVertices(newStartVertices);
     out->setEndVertices(newEndVertices);
@@ -344,8 +346,9 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
     std::set<int> newEndVertices;
     std::set<int> newStartVertices;
 
-
     if (left->endVertices < right->startVertices){
+        //std::cout << "Sources in left graph: " << left->adj.size() << std::endl;
+        //uint32_t counter = 0;
         for(auto &mapEntry: left->adj){
 
             uint32_t leftSource = mapEntry.first;
@@ -364,7 +367,13 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
                 }
             }
         }
+        //counter++;
+        //std::cout << std::string(depth, '\t') << "DEBUG: Start vertices size: " << newStartVertices.size() << std::endl;
+        //std::cout << std::string(depth, '\t') << "DEBUG: End vertices size: " << newEndVertices.size() << std::endl;
+
     } else {
+        //uint32_t counter = 0;
+        //std::cout << "Sources in right graph: " << right->adj.size() << std::endl;
         for (auto &mapEntry: right->adj){
             uint32_t rightSource = mapEntry.first;
             auto rightSourceVec = mapEntry.second;
@@ -379,6 +388,10 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
                     newStartVertices.insert(leftSource);
                 }
             }
+
+          //  counter++;
+          //  std::cout << std::string(depth, '\t') << "DEBUG: Start vertices size: " << newStartVertices.size() << std::endl;
+          //  std::cout << std::string(depth, '\t') << "DEBUG: End vertices size: " << newEndVertices.size() << std::endl;
         }
     }
 
@@ -386,6 +399,8 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
     out->setEndVertices(newEndVertices);
 
     //std::cout << std::string(depth, '\t') << "[x] join output size: " << out->adj.size() << std::endl;
+    //std::cout << std::string(depth, '\t') << "DEBUG: Start vertices size: " << newStartVertices.size() << std::endl;
+    //std::cout << std::string(depth, '\t') << "DEBUG: End vertices size: " << newEndVertices.size() << std::endl;
 
     return out;
 }
@@ -836,8 +851,8 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
         }
     }
 
-    if (!smartEnabled){
-        //std::cout << "DEBUG: Execute old evaluation query procedure" << std::endl;
+    if (!smartEnabled || tokens.size() <= 2){
+        std::cout << "DEBUG: Execute old evaluation query procedure" << std::endl;
 
         //std::cout << "DEBUG: Estimated paths: " << estimation.noPaths << std::endl;
         auto res = evaluate_aux_preselected(query, graph->endVertices, 0);
@@ -845,6 +860,105 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             cache.addToCache(query, res);
         }
         return SimpleEvaluator::computeStats(res);
+    } else if (plannerType == 1) {
+        int pivotStart = 0;
+        int pivotEnd = 0;
+        uint32_t minEstimatedPaths = 0;
+        for (int i = 0; i < tokens.size() - 1; i++){
+            std::string leftLabel = tokens[i];
+            std::string rightLabel = tokens[i+1];
+            auto result = est->estimateJoinSize(leftLabel, rightLabel);
+            uint32_t estimatedPaths = result.noPaths;
+            if (pivotStart == 0 && pivotEnd == 0){
+                minEstimatedPaths = estimatedPaths;
+                pivotEnd = i+1;
+            } else if (estimatedPaths < minEstimatedPaths) {
+                pivotStart = i;
+                pivotEnd = i+1;
+            }
+        }
+
+        std::cout << "Estimated size for (" << tokens[pivotStart] << "/" << tokens[pivotEnd] << "): " << minEstimatedPaths << std::endl;
+
+        // create string query for left tree
+        std::string strForLeftQuery = "";
+        int limit = tokens.size() - 2;
+        for (int i = 0; i < pivotStart - 1; i++){
+            strForLeftQuery += tokens[i];
+            strForLeftQuery += "/";
+        }
+        if (pivotStart > 0){
+            strForLeftQuery += tokens[pivotStart - 1];
+        }
+
+        // create string query for middle tree
+        std::string strForMiddleQuery = tokens[pivotStart] + "/" + tokens[pivotEnd];
+
+        // create string query for right tree
+        std::string strForRightQuery = "";
+        int32_t openBrackets = 0;
+        for (int i = pivotEnd + 1; i < tokens.size() - 1; i++){
+            strForRightQuery += "(";
+            openBrackets += 1;
+        }
+
+        for (int i = pivotEnd + 1; i < tokens.size() - 1; i++){
+            strForRightQuery += tokens[i];
+            if (i >= pivotEnd + 2){
+                strForRightQuery += ")";
+                openBrackets -= 1;
+            }
+            strForRightQuery += "/";
+        }
+
+        if (pivotEnd < tokens.size() - 1){
+            strForRightQuery += tokens[tokens.size() - 1];
+        }
+
+        if (openBrackets > 0){
+            strForRightQuery += ")";
+        }
+
+        std::cout << "DEBUG: string for left query: " + strForLeftQuery << std::endl;
+        std::cout << "DEBUG: string for middle query: " + strForMiddleQuery << std::endl;
+        std::cout << "DEBUG: string for right query: " + strForRightQuery << std::endl;
+
+        RPQTree* middleQueryTree = RPQTree::strToTree(strForMiddleQuery);
+        auto middleGraph = evaluate_aux_preselected(middleQueryTree, graph->endVertices, 0);
+        auto finalGraph = middleGraph;
+
+        if (!strForLeftQuery.empty()){
+            RPQTree* leftQueryTree = RPQTree::strToTree(strForLeftQuery);
+            auto leftGraph = evaluate_preselected_for_left_tree(leftQueryTree, middleGraph->startVertices, 0);
+            auto lmGraph = smart_join(leftGraph, middleGraph, 0);
+
+            if (!strForRightQuery.empty()){
+                RPQTree* rightQueryTree = RPQTree::strToTree(strForRightQuery);
+                auto rightGraph = evaluate_preselected_for_right_tree(rightQueryTree, middleGraph->endVertices, 0);
+                finalGraph = smart_join(lmGraph, rightGraph, 0);
+            } else {
+                finalGraph = lmGraph;
+            }
+
+        } else if (!strForRightQuery.empty()){
+            RPQTree* rightQueryTree = RPQTree::strToTree(strForRightQuery);
+            auto rightGraph = evaluate_preselected_for_right_tree(rightQueryTree, middleGraph->endVertices, 0);
+            finalGraph = smart_join(middleGraph, rightGraph, 0);
+        }
+
+
+        //std::cout << "DEBUG: Left graph size: " << leftGraph->getNoEdges() << std::endl;
+        //std::cout << "DEBUG: Middle graph size: " << middleGraph->getNoEdges() << std::endl;
+        //std::cout << "DEBUG: Right graph size: " << rightGraph->getNoEdges() << std::endl;
+
+        if (enableCache){
+            cache.addToCache(query, finalGraph);
+        }
+
+        cardStat stats = SimpleEvaluator::computeStats(finalGraph);
+        //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
+        return stats;
+
     } else {
 
         if (pivotPosition == tokens.size() - 1){
@@ -986,7 +1100,8 @@ int SimpleEvaluator::findPivotIndex(std::vector<std::string> tokens){
     int pivot = 0;
     int paths = 0;
     for (int i = 0; i < tokens.size(); i++){
-        uint32_t tokenPaths = est->cardinalityEstimatorTable[tokens[i]];
+        auto result = est->estimateLeafSize(tokens[i]);
+        uint32_t tokenPaths = result.noPaths;
         if (i == 0){
             paths = tokenPaths;
         } else if (tokenPaths < paths) {
