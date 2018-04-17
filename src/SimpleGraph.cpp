@@ -30,11 +30,48 @@ uint32_t SimpleGraph::getNoEdges() const {
     return sum;
 }
 
+bool sortPairsForStats(const std::pair<uint32_t,uint32_t> &a, const std::pair<uint32_t,uint32_t> &b) {
+    if (a.second < b.second) return true;
+    return false;
+}
+
+
 // sort on the second item in the pair, then on the first (ascending order)
 bool sortPairs(const std::pair<uint32_t,uint32_t> &a, const std::pair<uint32_t,uint32_t> &b) {
     if (a.second < b.second) return true;
     if (a.second == b.second) return a.first < b.first;
     return false;
+}
+
+uint32_t SimpleGraph::getUniqueEdgesForStat() const {
+    uint32_t sum = 0;
+
+    for (auto &mapEntry : adj) {
+
+        auto sourceVec = mapEntry.second;
+        std::set<uint32_t> targets;
+
+        /**
+        std::sort(sourceVec.begin(), sourceVec.end(), sortPairsForStats);
+
+        uint32_t prevTarget = 0;
+        bool first = true;
+        **/
+
+        for (const auto &labelTgtPair : sourceVec) {
+            /**
+            if (first || !(prevTarget == labelTgtPair.second)) {
+                first = false;
+                sum++;
+                prevTarget = labelTgtPair.second;
+            }
+             **/
+            targets.insert(labelTgtPair.second);
+        }
+        sum += targets.size();
+    }
+
+    return sum;
 }
 
 uint32_t SimpleGraph::getNoDistinctEdges() const {

@@ -43,6 +43,7 @@ class SimpleEvaluator : public Evaluator {
     std::shared_ptr<SimpleEstimator> est;
     SimpleIndex index;
     bool enableCache;
+    bool smartEnabled;
 
 public:
 

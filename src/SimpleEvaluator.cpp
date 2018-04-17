@@ -2,6 +2,7 @@
 // Created by Nikolay Yakovets on 2018-02-02.
 //
 
+#include <SimpleGraph.h>
 #include "SimpleEstimator.h"
 #include "SimpleEvaluator.h"
 
@@ -12,7 +13,8 @@ SimpleEvaluator::SimpleEvaluator(std::shared_ptr<SimpleGraph> &g) {
     est = nullptr; // estimator not attached by default
     cache;
     index;
-    enableCache = true;
+    enableCache = false;
+    smartEnabled = true;
 }
 
 void SimpleEvaluator::attachEstimator(std::shared_ptr<SimpleEstimator> &e) {
@@ -40,16 +42,21 @@ cardStat SimpleEvaluator::computeStats(std::shared_ptr<SimpleGraph> &g) {
     cardStat stats {};
 
     // TODO: modify this code to use the map iterator
+    uint32_t noOutIn = 0;
     for (auto &mapEntry : g->adj) {
-        stats.noOut += mapEntry.second.size();
+        noOutIn += mapEntry.second.size();
     }
 
     stats.noPaths = g->getNoDistinctEdges();
-
+    stats.noIn = noOutIn;
+    stats.noOut = noOutIn;
     // TODO: modify this code to use the map iterator
+    /**
     for (auto &mapEntry : g->reverse_adj) {
         stats.noIn += mapEntry.second.size();
     }
+     **/
+
 
     return stats;
 }
@@ -170,6 +177,7 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected_for_left_tree(
     //std::cout << "Preselected vertices size: " << preselectedVertices.size() << std::endl;
     //std::set<int> newTargetVertices;
     std::set<int> newStartVertices;
+    std::set<int> newEndVertices;
 
     if(!inverse) {
         // going forward
@@ -188,6 +196,7 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected_for_left_tree(
                     out->addEdge(source, target, label);
                     //newTargetVertices.insert(target);
                     newStartVertices.insert(source);
+                    newEndVertices.insert(target);
                 }
 
             }
@@ -210,12 +219,14 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::project_preselected_for_left_tree(
                     out->addEdge(source, target, label);
                     //newTargetVertices.insert(target);
                     newStartVertices.insert(source);
+                    newEndVertices.insert(target);
                 }
             }
         }
     }
 
     out->setStartVertices(newStartVertices);
+    out->setEndVertices(newEndVertices);
     //out->setStartVertices(newTargetVertices);
     return out;
 }
@@ -333,7 +344,9 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
     std::set<int> newEndVertices;
     std::set<int> newStartVertices;
 
-    for(auto &mapEntry: left->adj){
+
+    if (left->endVertices < right->startVertices){
+        for(auto &mapEntry: left->adj){
 
             uint32_t leftSource = mapEntry.first;
             auto leftSourceVec = mapEntry.second;
@@ -345,12 +358,29 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::smart_join(std::shared_ptr<SimpleG
 
                     auto rightTarget = rightLabelTarget.second;
                     out->addEdge(leftSource, rightTarget, 0);
+                    //std::make_pair(edgeLabel, to)
                     newEndVertices.insert(rightTarget);
                     newStartVertices.insert(leftSource);
                 }
             }
-    }
+        }
+    } else {
+        for (auto &mapEntry: right->adj){
+            uint32_t rightSource = mapEntry.first;
+            auto rightSourceVec = mapEntry.second;
+            for (auto rightLabelTarget: rightSourceVec){
+                int rightTarget = rightLabelTarget.second;
 
+                // select the corresponding sources from left graph using reverse_adj
+                for (auto leftLabelSource: left->reverse_adj[rightSource]){
+                    auto leftSource = leftLabelSource.second;
+                    out -> addEdge(leftSource, rightTarget, 0);
+                    newEndVertices.insert(rightTarget);
+                    newStartVertices.insert(leftSource);
+                }
+            }
+        }
+    }
 
     out->setStartVertices(newStartVertices);
     out->setEndVertices(newEndVertices);
@@ -648,7 +678,7 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_left_tree
 
 
         // join left with right
-        g = SimpleEvaluator::join(leftGraph, rightGraph, depth);
+        g = SimpleEvaluator::smart_join(leftGraph, rightGraph, depth);
         //std::cout  << std::string(depth, '\t') << "DEBUG: joined graph start vertices: " << g->startVertices.size() << std::endl;
 
         //g->printGraph();
@@ -761,7 +791,7 @@ std::shared_ptr<SimpleGraph> SimpleEvaluator::evaluate_preselected_for_right_tre
 
 
         // join left with right
-        g = SimpleEvaluator::join(leftGraph, rightGraph, depth);
+        g = SimpleEvaluator::smart_join(leftGraph, rightGraph, depth);
         //std::cout  << std::string(depth, '\t') << "DEBUG: joined graph end vertices: " << g->endVertices.size() << std::endl;
 
         //g->printGraph();
@@ -799,8 +829,6 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
     //std::cout << "pivot index position: " << pivotPosition << std::endl;
     //std::cout << "pivot index value: " << tokens[pivotPosition] << std::endl;
 
-    bool useNewEvaluationMethod = false;
-
     if (enableCache){
         auto result = cache.getFromCache(query);
         if (result != nullptr){
@@ -808,7 +836,7 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
         }
     }
 
-    if (!useNewEvaluationMethod){
+    if (!smartEnabled){
         //std::cout << "DEBUG: Execute old evaluation query procedure" << std::endl;
 
         //std::cout << "DEBUG: Estimated paths: " << estimation.noPaths << std::endl;
@@ -820,7 +848,7 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
     } else {
 
         if (pivotPosition == tokens.size() - 1){
-            //std::cout << "Execute plan for case 1" << std::endl;
+            //std::cout << "DEBUG: Execute plan for case 1" << std::endl;
 
             std::string strForTree = "";
             int limit = tokens.size() - 2;
@@ -839,7 +867,7 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             RPQTree* leftTreeQuery = RPQTree::strToTree(strForTree);
             auto leftGraph = evaluate_preselected_for_left_tree(leftTreeQuery, rightGraph->startVertices, 0);
 
-            auto finalGraph = join(leftGraph, rightGraph, 0);
+            auto finalGraph = smart_join(leftGraph, rightGraph, 0);
             if (enableCache){
                 cache.addToCache(query, finalGraph);
             }
@@ -847,8 +875,8 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             cardStat stats = SimpleEvaluator::computeStats(finalGraph);
             //std::cout << "Actual (noOut, noPaths, noIn) : (" << stats.noOut << ", " << stats.noPaths << ", " << stats.noIn << ")\n";
             return stats;
-        } else if (pivotPosition == 1) {
-            //std::cout << "Execute old evaluation query procedure" << std::endl;
+        } else if (pivotPosition == 0) {
+            //std::cout << "DEBUG: Execute case 2" << std::endl;
 
             std::string strForRightTree = "";
             for (int i = 2; i < tokens.size(); i++){
@@ -878,7 +906,7 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             //std::cout << "Final right graph size: " << rightGraph->getNoEdges() << std::endl;
             //std::cout << "Final right graph start vertices: " << rightGraph->startVertices.size() << std::endl;
 
-            auto finalGraph = join(leftGraph, rightGraph, 0);
+            auto finalGraph = smart_join(leftGraph, rightGraph, 0);
             if (enableCache){
                 cache.addToCache(query, finalGraph);
             }
@@ -890,7 +918,9 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             return stats;
 
         } else {
+            //std::cout << "DEBUG: Execute case 3" << std::endl;
 
+            //std::cout << "DEBUG: string for middle query: " + tokens[pivotPosition] << std::endl;
             RPQTree* middleQueryTree = RPQTree::strToTree(tokens[pivotPosition]);
 
             std::string strForLeftTree = "";
@@ -905,19 +935,26 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
 
             // construct string for right query
             std::string strForRightTree = "";
+            int32_t openBrackets = 0;
             for (int i = pivotPosition + 1; i < tokens.size() - 1; i++){
                 strForRightTree += "(";
+                openBrackets += 1;
             }
 
             for (int i = pivotPosition + 1; i < tokens.size() - 1; i++){
                 strForRightTree += tokens[i];
                 if (i >= pivotPosition + 2){
                     strForRightTree += ")";
+                    openBrackets -= 1;
                 }
                 strForRightTree += "/";
             }
             strForRightTree += tokens[tokens.size() - 1];
-            strForRightTree += ")";
+
+            if (openBrackets > 0){
+                strForRightTree += ")";
+            }
+
             //std::cout << "DEBUG: string for right query: " + strForRightTree << std::endl;
             RPQTree* rightQueryTree = RPQTree::strToTree(strForRightTree);
 
@@ -929,8 +966,8 @@ cardStat SimpleEvaluator::evaluate(RPQTree *query) {
             //std::cout << "DEBUG: Middle graph size: " << middleGraph->getNoEdges() << std::endl;
             //std::cout << "DEBUG: Right graph size: " << rightGraph->getNoEdges() << std::endl;
 
-            auto lmGraph = join(leftGraph, middleGraph, 0);
-            auto finalGraph = join(lmGraph, rightGraph, 0);
+            auto lmGraph = smart_join(leftGraph, middleGraph, 0);
+            auto finalGraph = smart_join(lmGraph, rightGraph, 0);
             if (enableCache){
                 cache.addToCache(query, finalGraph);
             }
