@@ -15,7 +15,7 @@ SimpleEvaluator::SimpleEvaluator(std::shared_ptr<SimpleGraph> &g) {
     index;
     enableCache = false;
     smartEnabled = true;
-    plannerType = 1;
+    plannerType = 0;
 }
 
 void SimpleEvaluator::attachEstimator(std::shared_ptr<SimpleEstimator> &e) {
